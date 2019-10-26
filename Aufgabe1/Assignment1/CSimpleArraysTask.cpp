@@ -59,14 +59,11 @@ bool CSimpleArraysTask::InitResources(cl_device_id Device, cl_context Context)
 	
 	// load and compile kernels
 
-	size_t programSize = 0;
+	// size_t programSize = 0; 	// unused
 	string programCode;
 
 	// create program object (this might contain multiple kernel entry points)
-
-	// ToDO Create relative path
-	if (!CLUtil::LoadProgramSourceToMemory("C:\\Users\\malte\\source\\repos\\Aufgabe1\\Aufgabe1\\Assignment1\\VectorAdd.cl", programCode)) {
-	//if (!CLUtil::LoadProgramSourceToMemory("..\\Assignment1\\VectorAdd.cl", programCode)) {
+	if (!CLUtil::LoadProgramSourceToMemory("../Assignment1/VectorAdd.cl", programCode)) {
 			return false;
 	}
 	m_Program = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
