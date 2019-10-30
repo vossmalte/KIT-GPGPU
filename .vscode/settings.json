@@ -1,0 +1,4 @@
+{
+    "C_Cpp.default.cppStandard": "c++11",
+    "C_Cpp.default.includePath":["path1","path2"]
+}
