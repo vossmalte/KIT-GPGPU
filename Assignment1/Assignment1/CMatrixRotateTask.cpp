@@ -96,7 +96,7 @@ void CMatrixRotateTask::ReleaseResources()
 	SAFE_DELETE_ARRAY(m_hGPUResultNaive);
 	SAFE_DELETE_ARRAY(m_hGPUResultOpt);
 
-	// TO DO: release device resources
+	// release device resources
 
 	SAFE_RELEASE_MEMOBJECT(m_dM);
 	SAFE_RELEASE_MEMOBJECT(m_dMR);
@@ -155,7 +155,6 @@ void CMatrixRotateTask::ComputeGPU(cl_context Context, cl_command_queue CommandQ
 	time = 0;
 	//clErr = clEnqueueNDRangeKernel(CommandQueue, m_OptimizedKernel, 2, NULL, &globalWorkSize[0], LocalWorkSize, 0, NULL, NULL);
 	V_RETURN_CL(clErr, "Error executing kernel");
-	// TO DO: time = GLUtil::ProfileKernel...
 	time = CLUtil::ProfileKernel(CommandQueue, m_OptimizedKernel, 2, &globalWorkSize[0], LocalWorkSize, 1000);
 	cout<<"Executed optimized kernel in "<<time<<" ms."<<endl;
 

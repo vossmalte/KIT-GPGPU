@@ -6,7 +6,6 @@
 
 __kernel void MatrixRotNaive(__global const float* M, __global float* MR, uint SizeX, uint SizeY)
 {
-	// TO DO: Add kernel code
 	int2 GID;
 	GID.x = get_global_id(0);
 	GID.y = get_global_id(1);

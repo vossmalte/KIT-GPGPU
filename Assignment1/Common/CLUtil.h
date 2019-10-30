@@ -36,7 +36,7 @@
 #include <algorithm>
 
 //! Utility class for frequently-needed OpenCL tasks
-// TO DO: replace this with a nicer OpenCL wrapper
+// For future: replace this with a nicer OpenCL wrapper
 class CLUtil
 {
 public:
