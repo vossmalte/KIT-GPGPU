@@ -1,4 +1,13 @@
 {
     "C_Cpp.default.cppStandard": "c++11",
-    "C_Cpp.default.includePath":["path1","path2"]
+    "C_Cpp.default.includePath": [
+        "path1",
+        "path2"
+    ],
+    "todo-tree.general.statusBar": "total",
+    "todo-tree.general.tags": [
+        "TODO",
+        "FIXME",
+        "TO DO"
+    ]
 }
