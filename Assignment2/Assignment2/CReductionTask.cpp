@@ -199,14 +199,42 @@ void CReductionTask::Reduction_SequentialAddressing(cl_context Context, cl_comma
 
 void CReductionTask::Reduction_Decomp(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+	// starting iteration parameters	
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	int nWorkGroups = m_N; 							// this equals the number of to be reduced elements in the next step
+	size_t globalWorkSize;							// number of threads in each iteration
 
-	// TO DO: Implement reduction with kernel decomposition
+	do
+	{
+		// parameters for this iteration
+		globalWorkSize = nWorkGroups / 2;
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		nWorkGroups = globalWorkSize / myLocalWorkSize;
+		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<nWorkGroups<<endl;
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ExecuteTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_DecompKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: pointer of out array
+		clError = clSetKernelArg(m_DecompKernel, 1, sizeof(cl_mem), (void*) &m_dPongArray);
+		// set third argument: N
+		clError = clSetKernelArg(m_DecompKernel, 2, sizeof(uint), (void*) &m_N);
+		// set third argument: pointer of localBlock
+		clError = clSetKernelArg(m_DecompKernel, 3, myLocalWorkSize * sizeof(uint), NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: Decomp");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_DecompKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: SequentialAddressing");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		// ping pong:
+		swap(m_dPingArray, m_dPongArray);
+	} while (nWorkGroups != 1);
+	// ping is the last output array, as they are being swapped at the end of each iteration
 }
 
 void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
