@@ -239,9 +239,6 @@ void CReductionTask::Reduction_Decomp(cl_context Context, cl_command_queue Comma
 
 void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
-
-	// TO DO: Implement reduction with loop unrolling
-
 	// starting iteration parameters	
 	cl_int clError;
 	size_t myLocalWorkSize = LocalWorkSize[0];
@@ -264,7 +261,7 @@ void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue
 		// set third argument: N
 		uint n = myLocalWorkSize;
 		clError = clSetKernelArg(m_DecompUnrollKernel, 2, sizeof(uint), (void*) &n);
-		// set third argument: pointer of localBlock
+		// set forth argument: pointer of localBlock
 		clError = clSetKernelArg(m_DecompUnrollKernel, 3, myLocalWorkSize * sizeof(uint), NULL);
 		V_RETURN_CL(clError, "Failed to set kernel args: DecompUnroll");
 		///////////////////////////////////////////////////////////////////////////////////////////
@@ -279,7 +276,6 @@ void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue
 		swap(m_dPingArray, m_dPongArray);
 	} while (nWorkGroups != 1);
 	// ping is the last output array, as they are being swapped at the end of each iteration
-
 }
 
 void CReductionTask::Reduction_DecompAtomics(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
@@ -287,12 +283,43 @@ void CReductionTask::Reduction_DecompAtomics(cl_context Context, cl_command_queu
 
 	// TO DO: Implement reduction with Atomics
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ExecuteTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	int nWorkGroups = m_N; 							// this equals the number of to be reduced elements in the next step
+	size_t globalWorkSize;							// number of threads in each iteration
 
+	do
+	{
+		// parameters for this iteration
+		globalWorkSize = nWorkGroups / 2;
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		nWorkGroups = globalWorkSize / myLocalWorkSize;
+		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<nWorkGroups<<endl;
+
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_DecompAtomicsKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: pointer of out array
+		clError = clSetKernelArg(m_DecompAtomicsKernel, 1, sizeof(cl_mem), (void*) &m_dPongArray);
+		// set third argument: N
+		uint n = myLocalWorkSize;
+		clError = clSetKernelArg(m_DecompAtomicsKernel, 2, sizeof(uint), (void*) &n);
+		// set forth argument: localSum
+		uint* sum = 0;
+		clError = clSetKernelArg(m_DecompAtomicsKernel, 3, sizeof(uint), NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: DecompAtomics");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_DecompAtomicsKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: DecompAtomics");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		// ping pong:
+		swap(m_dPingArray, m_dPongArray);
+	} while (nWorkGroups != 1);
+	// ping is the last output array, as they are being swapped at the end of each iteration
 }
 
 void CReductionTask::ExecuteTask(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3], unsigned int Task)
@@ -338,9 +365,6 @@ void CReductionTask::TestPerformance(cl_context Context, cl_command_queue Comman
 
 	CTimer timer;
 	timer.Start();
-
-	// TODO: remove this to test
-	// return;
 
 	//run the kernel N times
 	unsigned int nIterations = 100;

@@ -86,5 +86,13 @@ __kernel void Reduction_DecompUnroll(const __global uint* inArray, __global uint
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Reduction_DecompAtomics(const __global uint* inArray, __global uint* outArray, uint N, __local uint* localSum)
 {
-	// TO DO: Kernel implementation
+	int GID = get_global_id(0);
+	int LID = get_local_id(0);
+	// initialize localSum
+	if (LID == 0) *localSum = 0;
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	atomic_add(localSum, inArray[GID] + inArray[GID + get_global_size(0)]);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (LID == 0) outArray[get_group_id(0)] = *localSum;
 }
