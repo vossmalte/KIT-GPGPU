@@ -43,7 +43,7 @@ bool CReductionTask::InitResources(cl_device_id Device, cl_context Context)
 	//fill the array with some values
 	for(unsigned int i = 0; i < m_N; i++) 
 		//m_hInput[i] = 1;			// Use this for debugging
-		m_hInput[i] = rand() & 15;
+		m_hInput[i] = rand() & 15;	// TODO remove debugging
 
 	//device resources
 	cl_int clError, clError2;
@@ -56,7 +56,7 @@ bool CReductionTask::InitResources(cl_device_id Device, cl_context Context)
 	//load and compile kernels
 	string programCode;
 
-	CLUtil::LoadProgramSourceToMemory("Reduction.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment2/Reduction.cl", programCode);
 	m_Program = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(m_Program == nullptr) return false;
 
@@ -130,6 +130,7 @@ void CReductionTask::ComputeCPU()
 
 	double ms = timer.GetElapsedMilliseconds() / double(nIterations);
 	cout << "  average time: " << ms << " ms, throughput: " << 1.0e-6 * (double)m_N / ms << " Gelem/s" <<endl;
+	// cout << "CPU result: " << m_resultCPU << endl;		// debug
 }
 
 bool CReductionTask::ValidateResults()
@@ -148,22 +149,52 @@ bool CReductionTask::ValidateResults()
 
 void CReductionTask::Reduction_InterleavedAddressing(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
-	//cl_int clErr;
-	//size_t globalWorkSize[1];
-	//size_t localWorkSize[1];
-	//unsigned int stride = ...;
+	// log can be computed by right-shifting
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	for (size_t i = 1; m_N >> i > 0; i++) {
+		// set first argument: pointer of array
+		clError = clSetKernelArg(m_InterleavedAddressingKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: stride
+		uint stride = 1 << (i-1);
+		clError |= clSetKernelArg(m_InterleavedAddressingKernel, 1, sizeof(int), &stride);
+		V_RETURN_CL(clError, "Failed to set kernel args: InterleavedAddressing");
 
-	// TO DO: Implement reduction with interleaved addressing
+		size_t globalWorkSize = (size_t) (m_N >> i);		// number of threads
 
-	//for (...) {
-	//}
+		// adapt LocalWorkSize to the Problem
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		//cout << "GlobalSize: " << globalWorkSize << ", LocalWorksize: " << myLocalWorkSize << endl;
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_InterleavedAddressingKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: InterleavedAddressing");							
+	}
 }
 
 void CReductionTask::Reduction_SequentialAddressing(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+	// log can be computed by right-shifting
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	for (size_t i = 1; m_N >> i > 0; i++) {
+		// set first argument: pointer of array
+		clError = clSetKernelArg(m_SequentialAddressingKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: stride
+		uint stride = 1 << (i-1);
+		clError |= clSetKernelArg(m_SequentialAddressingKernel, 1, sizeof(int), &stride);
+		V_RETURN_CL(clError, "Failed to set kernel args: SequentialAddressing");
 
-	// TO DO: Implement reduction with sequential addressing
+		size_t globalWorkSize = (size_t) (m_N >> i);		// number of threads
 
+		// adapt LocalWorkSize to the Problem
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		//cout << "GlobalSize: " << globalWorkSize << ", LocalWorksize: " << myLocalWorkSize << endl;
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_SequentialAddressingKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: SequentialAddressing");
+	}
 }
 
 void CReductionTask::Reduction_Decomp(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
@@ -232,6 +263,7 @@ void CReductionTask::ExecuteTask(cl_context Context, cl_command_queue CommandQue
 	//read back the results synchronously.
 	m_resultGPU[Task] = 0;
 	V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dPingArray, CL_TRUE, 0, 1 * sizeof(cl_uint), &m_resultGPU[Task], 0, NULL, NULL), "Error reading data from device!");
+	// cout << "Result: " << m_resultGPU[Task] << endl; 	// debug
 	
 }
 
@@ -246,6 +278,9 @@ void CReductionTask::TestPerformance(cl_context Context, cl_command_queue Comman
 
 	CTimer timer;
 	timer.Start();
+
+	// TODO: remove this to test
+	// return;
 
 	//run the kernel N times
 	unsigned int nIterations = 100;

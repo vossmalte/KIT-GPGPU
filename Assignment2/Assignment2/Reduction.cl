@@ -2,14 +2,17 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Reduction_InterleavedAddressing(__global uint* array, uint stride) 
 {
-	// TO DO: Kernel implementation
+	int x = 2 * stride * get_global_id(0);
+	//if (x + stride > 2*8388608){printf("%i\n", x);} else	// debug
+	array[ x ] = array[ x ] + array[ x + stride ];
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Reduction_SequentialAddressing(__global uint* array, uint stride) 
 {
-	// TO DO: Kernel implementation
+	int x = get_global_id(0);
+	array[ x ] = array[ x ] + array [ x + get_global_size(0)];
 }
 
 
