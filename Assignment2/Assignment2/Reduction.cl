@@ -47,7 +47,39 @@ __kernel void Reduction_Decomp(const __global uint* inArray, __global uint* outA
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Reduction_DecompUnroll(const __global uint* inArray, __global uint* outArray, uint N, __local uint* localBlock)
 {
-	// TO DO: Kernel implementation
+	int LID = get_local_id(0);
+	int GID = get_global_id(0);
+	int numOfThreads = get_local_size(0);
+
+	// First step: Load Data into localBlock while reducing it already
+	localBlock[ LID ] = inArray[ GID ] + inArray[ GID + get_global_size(0) ];
+	barrier(CLK_LOCAL_MEM_FENCE);	// wait until array is written
+
+	// second part: reduce localBlock
+	// implementation is like sequential addressing
+	int stride;
+	for (int i = 1; (numOfThreads >> i) > 32; i++) {
+		stride = numOfThreads >> i;	// half the number of threads in each step
+		if (LID < stride) {			// workItem used for reduction
+			localBlock[ LID ] += localBlock[ LID + stride];
+		}
+		barrier(CLK_LOCAL_MEM_FENCE);	// wait until reduction step is complete
+	}
+	
+	int max_stride = numOfThreads / 2;
+	// unroll the loop
+	if (LID < 32 && 32 <= max_stride) localBlock[ LID ] += localBlock[ LID + 32];
+	if (LID < 16 && 16 <= max_stride) localBlock[ LID ] += localBlock[ LID + 16];
+	if (LID <  8 &&  8 <= max_stride) localBlock[ LID ] += localBlock[ LID +  8];
+	if (LID <  4 &&  4 <= max_stride) localBlock[ LID ] += localBlock[ LID +  4];
+	if (LID <  2 &&  2 <= max_stride) localBlock[ LID ] += localBlock[ LID +  2];
+	if (LID <  1 &&  1 <= max_stride) localBlock[ LID ] += localBlock[ LID +  1];
+
+
+	// write back
+	if (LID == 0) { // only one thread writes back
+		outArray[ get_group_id(0) ] = localBlock[ 0 ];
+	}
 }
 
 

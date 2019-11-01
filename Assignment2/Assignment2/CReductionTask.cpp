@@ -229,7 +229,7 @@ void CReductionTask::Reduction_Decomp(cl_context Context, cl_command_queue Comma
 		clError = clEnqueueNDRangeKernel(CommandQueue, m_DecompKernel, 1, NULL,
 										&globalWorkSize, &myLocalWorkSize,
 										0, NULL, NULL);	
-		V_RETURN_CL(clError, "Failed to execute Kernel: SequentialAddressing");
+		V_RETURN_CL(clError, "Failed to execute Kernel: Decomp");
 		///////////////////////////////////////////////////////////////////////////////////////////
 		// ping pong:
 		swap(m_dPingArray, m_dPongArray);
@@ -242,11 +242,43 @@ void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue
 
 	// TO DO: Implement reduction with loop unrolling
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ExecuteTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+	// starting iteration parameters	
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	int nWorkGroups = m_N; 							// this equals the number of to be reduced elements in the next step
+	size_t globalWorkSize;							// number of threads in each iteration
+
+	do
+	{
+		// parameters for this iteration
+		globalWorkSize = nWorkGroups / 2;
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		nWorkGroups = globalWorkSize / myLocalWorkSize;
+		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<nWorkGroups<<endl;
+
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_DecompUnrollKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: pointer of out array
+		clError = clSetKernelArg(m_DecompUnrollKernel, 1, sizeof(cl_mem), (void*) &m_dPongArray);
+		// set third argument: N
+		uint n = myLocalWorkSize;
+		clError = clSetKernelArg(m_DecompUnrollKernel, 2, sizeof(uint), (void*) &n);
+		// set third argument: pointer of localBlock
+		clError = clSetKernelArg(m_DecompUnrollKernel, 3, myLocalWorkSize * sizeof(uint), NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: DecompUnroll");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_DecompUnrollKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: DecompUnroll");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		// ping pong:
+		swap(m_dPingArray, m_dPongArray);
+	} while (nWorkGroups != 1);
+	// ping is the last output array, as they are being swapped at the end of each iteration
 
 }
 
