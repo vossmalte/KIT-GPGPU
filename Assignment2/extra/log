@@ -1,0 +1,72 @@
+LocalWorkSize 32:
+Testing performance of task interleavedAddressing
+  average time: 6.96645 ms, throughput: 2.40829 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.54633 ms, throughput: 6.58878 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 1.83251 ms, throughput: 9.15531 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 1.5217 ms, throughput: 11.0253 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 1.5947 ms, throughput: 10.5206 Gelem/s
+
+
+LocalWorkSize 64:
+Testing performance of task interleavedAddressing
+  average time: 6.9618 ms, throughput: 2.4099 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.12091 ms, throughput: 7.91039 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 1.27556 ms, throughput: 13.1528 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 0.879571 ms, throughput: 19.0743 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 0.82474 ms, throughput: 20.3424 Gelem/s
+
+LocalWorkSize 128:
+Testing performance of task interleavedAddressing
+  average time: 7.69042 ms, throughput: 2.18157 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.15411 ms, throughput: 7.78847 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 1.33163 ms, throughput: 12.599 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 0.89498 ms, throughput: 18.7459 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 0.789201 ms, throughput: 21.2585 Gelem/s
+
+LocalWorkSize 256:
+Testing performance of task interleavedAddressing
+  average time: 6.95435 ms, throughput: 2.41248 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.10542 ms, throughput: 7.96859 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 1.50609 ms, throughput: 11.1396 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 0.954959 ms, throughput: 17.5685 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 0.759609 ms, throughput: 22.0867 Gelem/s
+
+LocalWorkSize 512:
+Testing performance of task interleavedAddressing
+  average time: 6.92039 ms, throughput: 2.42432 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.1183 ms, throughput: 7.92013 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 1.74919 ms, throughput: 9.59141 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 1.19038 ms, throughput: 14.094 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 0.777099 ms, throughput: 21.5895 Gelem/s
+
+LocalWorkSize 1024:
+Testing performance of task interleavedAddressing
+  average time: 6.9037 ms, throughput: 2.43018 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 2.12055 ms, throughput: 7.91173 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 2.1691 ms, throughput: 7.73464 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 1.51296 ms, throughput: 11.089 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 0.83858 ms, throughput: 20.0067 Gelem/s

@@ -1,0 +1,9 @@
+Comparison:
+As the graphic shows, Atomics out-perform all other approaches by a minimum speedup of 20%
+Different LocalWorkSize do not seem to affect Atomics to much.
+It performed best with a work-group size of 256.
+
+Personally, I was surprised that loop-unrolling made such a difference.
+
+Check out how kernelDecompositionUnroll and kernelDecompositionAtomics perform on a similar level.
+But the atomic code is so much easier to maintain.
