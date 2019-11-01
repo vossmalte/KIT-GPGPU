@@ -13,12 +13,13 @@ using namespace std;
 ///////////////////////////////////////////////////////////////////////////////
 // CReductionTask
 
-string g_kernelNames[5] = {
+string g_kernelNames[6] = {
 	"interleavedAddressing",
 	"sequentialAddressing",
 	"kernelDecomposition",
 	"kernelDecompositionUnroll",
-	"kernelDecompositionAtomics"
+	"kernelDecompositionAtomics",
+	"kernelLoadMax"
 };
 
 CReductionTask::CReductionTask(size_t ArraySize)
@@ -76,6 +77,9 @@ bool CReductionTask::InitResources(cl_device_id Device, cl_context Context)
 	m_DecompAtomicsKernel = clCreateKernel(m_Program, "Reduction_DecompAtomics", &clError);
 	V_RETURN_FALSE_CL(clError, "Failed to create kernel: Reduction_DecompAtomics.");
 
+	m_LoadMaxKernel = clCreateKernel(m_Program, "Reduction_LoadMax", &clError);
+	V_RETURN_FALSE_CL(clError, "Failed to create kernel: Reduction_LoadMax.");
+
 	return true;
 }
 
@@ -93,6 +97,7 @@ void CReductionTask::ReleaseResources()
 	SAFE_RELEASE_KERNEL(m_DecompKernel);
 	SAFE_RELEASE_KERNEL(m_DecompUnrollKernel);
 	SAFE_RELEASE_KERNEL(m_DecompAtomicsKernel);
+	SAFE_RELEASE_KERNEL(m_LoadMaxKernel);
 
 	SAFE_RELEASE_PROGRAM(m_Program);
 }
@@ -104,12 +109,14 @@ void CReductionTask::ComputeGPU(cl_context Context, cl_command_queue CommandQueu
 	ExecuteTask(Context, CommandQueue, LocalWorkSize, 2);
 	ExecuteTask(Context, CommandQueue, LocalWorkSize, 3);
 	ExecuteTask(Context, CommandQueue, LocalWorkSize, 4);
+	ExecuteTask(Context, CommandQueue, LocalWorkSize, 5);
 
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 0);
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 1);
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 2);
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 3);
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 4);
+	TestPerformance(Context, CommandQueue, LocalWorkSize, 5);
 
 }
 
@@ -137,7 +144,7 @@ bool CReductionTask::ValidateResults()
 {
 	bool success = true;
 
-	for(int i = 0; i < 5; i++)
+	for(int i = 0; i < 6; i++)
 		if(m_resultGPU[i] != m_resultCPU)
 		{
 			cout<<"Validation of reduction kernel "<<g_kernelNames[i]<<" failed." << endl;
@@ -305,7 +312,6 @@ void CReductionTask::Reduction_DecompAtomics(cl_context Context, cl_command_queu
 		uint n = myLocalWorkSize;
 		clError = clSetKernelArg(m_DecompAtomicsKernel, 2, sizeof(uint), (void*) &n);
 		// set forth argument: localSum
-		uint* sum = 0;
 		clError = clSetKernelArg(m_DecompAtomicsKernel, 3, sizeof(uint), NULL);
 		V_RETURN_CL(clError, "Failed to set kernel args: DecompAtomics");
 		///////////////////////////////////////////////////////////////////////////////////////////
@@ -319,6 +325,69 @@ void CReductionTask::Reduction_DecompAtomics(cl_context Context, cl_command_queu
 		// ping pong:
 		swap(m_dPingArray, m_dPongArray);
 	} while (nWorkGroups != 1);
+	// ping is the last output array, as they are being swapped at the end of each iteration
+}
+
+void CReductionTask::Reduction_LoadMax(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
+{
+	/* 
+	Idea of this approach:
+	Load as many values as possible into the local memory.
+	Then each work-item reduces its fair share of values.
+
+	After that each workitem writes its result with an atomic add to a local value (local sum)
+
+	In the end one work-item of each work-group writes this local sum to the outArray
+	
+	These steps are iterated
+	*/
+	// cl_ulong localMemorySize;
+	// clGetDeviceIDs(...)
+	// clGetDeviceInfo(m_CLDevice, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &localMemorySize, &bufferSize);
+	int localMemorySize = 49152;	// in byte
+	localMemorySize = 32768;		// better use this: a whole power of 2
+
+	localMemorySize /= sizeof(uint);	// in number of uint
+
+	// cout << "Local memory fits " << localMemorySize << " uint's" << endl;
+
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	int nToReduce = m_N; 		// this equals the number of to be reduced elements in the next step
+	size_t globalWorkSize;							// number of threads in each iteration
+
+	do
+	{
+		// parameters for this iteration
+		globalWorkSize = nToReduce * myLocalWorkSize / localMemorySize;
+		globalWorkSize = globalWorkSize > 0 ? globalWorkSize : nToReduce;		// reset if too small globalWorkSize
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<globalWorkSize/myLocalWorkSize<<endl;
+
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_LoadMaxKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: pointer of out array
+		clError = clSetKernelArg(m_LoadMaxKernel, 1, sizeof(cl_mem), (void*) &m_dPongArray);
+		// set third argument: N
+		uint maxElements = min(nToReduce, localMemorySize);
+		clError = clSetKernelArg(m_LoadMaxKernel, 2, sizeof(uint), (void*) &maxElements);
+		// set forth argument: localSum
+		clError = clSetKernelArg(m_LoadMaxKernel, 3, sizeof(uint), NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: LoadMax");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_LoadMaxKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: LoadMax");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		// ping pong:
+		swap(m_dPingArray, m_dPongArray);
+		
+		nToReduce /= localMemorySize;		// number of outputs = number of to be reduced elements in the next step
+	} while (nToReduce >= 1);
 	// ping is the last output array, as they are being swapped at the end of each iteration
 }
 
@@ -343,6 +412,9 @@ void CReductionTask::ExecuteTask(cl_context Context, cl_command_queue CommandQue
 			break;
 		case 4:
 			Reduction_DecompAtomics(Context, CommandQueue, LocalWorkSize);
+			break;
+		case 5:
+			Reduction_LoadMax(Context, CommandQueue, LocalWorkSize);
 			break;
 
 	}
@@ -385,6 +457,9 @@ void CReductionTask::TestPerformance(cl_context Context, cl_command_queue Comman
 				break;
 			case 4:
 				Reduction_DecompAtomics(Context, CommandQueue, LocalWorkSize);
+				break;
+			case 5:
+				Reduction_LoadMax(Context, CommandQueue, LocalWorkSize);
 				break;
 		}
 	}

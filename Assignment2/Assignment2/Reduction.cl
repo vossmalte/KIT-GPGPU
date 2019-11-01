@@ -96,3 +96,25 @@ __kernel void Reduction_DecompAtomics(const __global uint* inArray, __global uin
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (LID == 0) outArray[get_group_id(0)] = *localSum;
 }
+
+__kernel void Reduction_LoadMax(const __global uint* inArray, __global uint* outArray, uint maxElements, __local uint* localSum)
+{
+	int local_size = get_local_size(0);
+	int LID = get_local_id(0);
+	int elementsPerWorkItem = maxElements / local_size;
+
+	// initialize localSum
+	if (LID == 0) *localSum = 0;
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	uint workItemSum = 0;
+	//if (0 == (LID|get_group_id(0))) printf("ePWI: %i\n", elementsPerWorkItem);
+	for (int i = 0; i < elementsPerWorkItem; i++)
+		workItemSum += inArray[LID + i*elementsPerWorkItem];
+
+	atomic_add(localSum, workItemSum);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	// store data:
+	if (LID == 0) outArray[get_group_id(0)] = *localSum;
+
+}
