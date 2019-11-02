@@ -1,0 +1,30 @@
+My implementation also beats the the last part of the task :-)
+
+/////////////////////////////////////
+log
+/////////////////////////////////////
+
+
+########################################
+Running parallel reduction task...
+
+Build log:
+
+
+Computing CPU reference result...  average time: 117.395 ms, throughput: 0.571648 Gelem/s
+DONE
+Computing GPU result...
+Testing performance of task interleavedAddressing
+  average time: 28.0022 ms, throughput: 2.39656 Gelem/s
+Testing performance of task sequentialAddressing
+  average time: 8.37269 ms, throughput: 8.01521 Gelem/s
+Testing performance of task kernelDecomposition
+  average time: 5.976 ms, throughput: 11.2297 Gelem/s
+Testing performance of task kernelDecompositionUnroll
+  average time: 3.77222 ms, throughput: 17.7903 Gelem/s
+Testing performance of task kernelDecompositionAtomics
+  average time: 3.05326 ms, throughput: 21.9794 Gelem/s
+Testing performance of task kernelLoadMax
+  average time: 2.67832 ms, throughput: 25.0563 Gelem/s
+
+
