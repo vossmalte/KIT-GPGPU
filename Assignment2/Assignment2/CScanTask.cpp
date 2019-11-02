@@ -86,7 +86,7 @@ bool CScanTask::InitResources(cl_device_id Device, cl_context Context)
 	//load and compile kernels
 	string programCode;
 
-	CLUtil::LoadProgramSourceToMemory("Scan.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment2/Scan.cl", programCode);
 	m_Program = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(m_Program == nullptr) return false;
 
@@ -186,6 +186,42 @@ void CScanTask::Scan_Naive(cl_context Context, cl_command_queue CommandQueue, si
 	// (CReductionTask::ValidateTask)
 	//
 	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+
+	// starting iteration parameters	
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	size_t globalWorkSize = m_N;							// number of threads in each iteration
+
+	for (uint i = 1; i <= m_N/2; i<<=1)
+	{
+		// parameters for this iteration
+		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
+		int nWorkGroups = globalWorkSize / myLocalWorkSize;
+		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<nWorkGroups<<endl;
+
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_ScanNaiveKernel, 0, sizeof(cl_mem), (void*) &m_dPingArray);
+		// set second argument: pointer of out array
+		clError = clSetKernelArg(m_ScanNaiveKernel, 1, sizeof(cl_mem), (void*) &m_dPongArray);
+		// set third argument: N
+		clError = clSetKernelArg(m_ScanNaiveKernel, 2, sizeof(uint), (void*) &m_N);
+		// set third argument: offset
+		clError = clSetKernelArg(m_ScanNaiveKernel, 3, sizeof(uint), &i);
+		V_RETURN_CL(clError, "Failed to set kernel args: ScanNaive");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_ScanNaiveKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: ScanNaive");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		// ping pong:
+		swap(m_dPingArray, m_dPongArray);
+	}
+	// ping is the last output array, as they are being swapped at the end of each iteration
+
 }
 
 void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])

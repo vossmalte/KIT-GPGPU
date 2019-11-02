@@ -5,6 +5,13 @@
 __kernel void Scan_Naive(const __global uint* inArray, __global uint* outArray, uint N, uint offset) 
 {
 	// TO DO: Kernel implementation
+	int LID = get_local_id(0);
+	int GID = get_global_id(0);
+	int numOfThreads = get_local_size(0);
+	if (GID < offset)
+		outArray[ GID ] = inArray[ GID ];
+	else
+		outArray[ GID ] = inArray[ GID ] + inArray[ GID - offset ];
 }
 
 
