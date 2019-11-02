@@ -44,7 +44,7 @@ bool CReductionTask::InitResources(cl_device_id Device, cl_context Context)
 	//fill the array with some values
 	for(unsigned int i = 0; i < m_N; i++) 
 		//m_hInput[i] = 1;			// Use this for debugging
-		m_hInput[i] = rand() & 15;	// TODO remove debugging
+		m_hInput[i] = rand() & 15;
 
 	//device resources
 	cl_int clError, clError2;
@@ -287,9 +287,6 @@ void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue
 
 void CReductionTask::Reduction_DecompAtomics(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
-
-	// TO DO: Implement reduction with Atomics
-
 	cl_int clError;
 	size_t myLocalWorkSize = LocalWorkSize[0];
 	int nWorkGroups = m_N; 							// this equals the number of to be reduced elements in the next step
