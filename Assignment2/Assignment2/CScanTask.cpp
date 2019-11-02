@@ -62,8 +62,8 @@ bool CScanTask::InitResources(cl_device_id Device, cl_context Context)
 
 	//fill the array with some values
 	for(unsigned int i = 0; i < m_N; i++)
-		//m_hArray[i] = 1;			// Use this for debugging
-		m_hArray[i] = rand() & 15;
+		m_hArray[i] = 1;			// Use this for debugging
+		//m_hArray[i] = rand() & 15;		// TODO remove debuggin
 
 	//device resources
 	// ping-pong buffers
@@ -196,7 +196,6 @@ void CScanTask::Scan_Naive(cl_context Context, cl_command_queue CommandQueue, si
 	{
 		// parameters for this iteration
 		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
-		int nWorkGroups = globalWorkSize / myLocalWorkSize;
 		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<nWorkGroups<<endl;
 
 		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
@@ -228,6 +227,30 @@ void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQ
 {
 
 	// TO DO: Implement efficient version of scan
+	cl_int clError;
+	size_t myLocalWorkSize = LocalWorkSize[0];
+	size_t globalWorkSize = m_N / 2;
+
+	// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+	// set first argument: pointer of in array
+	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 0, sizeof(cl_mem), (void*) m_dLevelArrays);
+	// set second argument: pointer of out array
+	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 1, sizeof(cl_mem), (void*) m_dLevelArrays);
+	// set third argument: local block
+	size_t size = 2 * myLocalWorkSize;		// number of elements to store
+	size += size/32;						// number of pads
+	// cout << "LocalBlock size: " << size << endl;
+	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 2, size * sizeof(uint), NULL);
+	V_RETURN_CL(clError, "Failed to set kernel args: ScanWorkEfficient");
+	///////////////////////////////////////////////////////////////////////////////////////////
+
+	// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<endl;
+	// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+	clError = clEnqueueNDRangeKernel(CommandQueue, m_ScanWorkEfficientKernel, 1, NULL,
+									&globalWorkSize, &myLocalWorkSize,
+									0, NULL, NULL);	
+	V_RETURN_CL(clError, "Failed to execute Kernel: ScanWorkEfficient");
+	///////////////////////////////////////////////////////////////////////////////////////////
 
 	// Make sure that the local prefix sum works before you start experimenting with large arrays
 
@@ -250,6 +273,7 @@ void CScanTask::ValidateTask(cl_context Context, cl_command_queue CommandQueue, 
 	}
 
 	// validate results
+	// for (uint i = 0; i<2*LocalWorkSize[0]; i++) cout << m_hResultGPU[i] << ", ";		// debug
 	m_bValidationResults[Task] =( memcmp(m_hResultCPU, m_hResultGPU, m_N * sizeof(unsigned int)) == 0);
 }
 

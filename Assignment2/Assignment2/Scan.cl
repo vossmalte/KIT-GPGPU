@@ -4,7 +4,6 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Scan_Naive(const __global uint* inArray, __global uint* outArray, uint N, uint offset) 
 {
-	// TO DO: Kernel implementation
 	int LID = get_local_id(0);
 	int GID = get_global_id(0);
 	int numOfThreads = get_local_size(0);
@@ -27,14 +26,86 @@ __kernel void Scan_Naive(const __global uint* inArray, __global uint* outArray, 
 #define AVOID_BANK_CONFLICTS
 #ifdef AVOID_BANK_CONFLICTS
 	// TO DO: define your conflict-free macro here
+	#define OFFSET(A) (((A)/NUM_BANKS + (A)))
 #else
 	#define OFFSET(A) (A)
 #endif
+
+#define INDEXFROMRIGHT(i) ((2*local_size - 1 - (i)))
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Scan_WorkEfficient(__global uint* array, __global uint* higherLevelArray, __local uint* localBlock) 
 {
 	// TO DO: Kernel implementation
+	int GID = get_global_id(0);
+	int LID = get_local_id(0);
+	int local_size = get_local_size(0);
+	int subArrayStart = get_group_id(0) * 2 * local_size;
+
+	//////////////////////////////////////////////////////
+	// init: copy array to local memory	//////////////////
+	//////////////////////////////////////////////////////
+	localBlock[OFFSET(LID)] = array[subArrayStart + LID];
+	localBlock[OFFSET(local_size + LID)] = array[subArrayStart + local_size + LID];
+
+	//////////////////////////////////////////////////////
+	// first part: up-sweep	//////////////////////////////
+	//////////////////////////////////////////////////////
+	int stride = 1;
+	do {
+		barrier(CLK_LOCAL_MEM_FENCE);
+		if (LID < local_size/stride)
+			localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))] += 
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID + stride))];
+
+		// if (LID==0) printf("current last value: %i\n",localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))]);
+
+		// update values vor next iteration
+		stride *= 2;
+	} while (stride < local_size);
+
+	// set last element 0 ////////////////////////////////
+	if (LID == 0) localBlock[OFFSET(INDEXFROMRIGHT(0))] = 0;
+	//////////////////////////////////////////////////////
+	// second part: down-sweep	//////////////////////////
+	//////////////////////////////////////////////////////
+	// use stride from up-sweep
+	do {
+		barrier(CLK_LOCAL_MEM_FENCE);
+		if (LID < local_size/stride) {
+			// debug 
+			/*
+			if (LID==0) printf("before: l=%i, r=%i\n",
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID + stride))],
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))]);
+			*/
+
+			// right child = sum of the nodes
+			localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))] +=
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID + stride))];
+
+			// left child
+			localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID + stride))] = 
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))] - 
+				localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID + stride))];
+		}
+
+		// if (LID==0) printf("current last value: %i\n",localBlock[OFFSET(INDEXFROMRIGHT(2*stride*LID))]);
+
+		// update values vor next iteration
+		stride /= 2;
+	} while(stride > 0);
+
+
+	//////////////////////////////////////////////////////
+	// round-up: make inclusive and store	//////////////
+	//////////////////////////////////////////////////////
+	barrier(CLK_LOCAL_MEM_FENCE);
+	localBlock[OFFSET(LID)] += array[subArrayStart + LID];
+	localBlock[OFFSET(local_size + LID)] += array[subArrayStart + local_size + LID];
+	
+	higherLevelArray[subArrayStart + LID] = localBlock[OFFSET(LID)];
+	higherLevelArray[subArrayStart + local_size + LID] = localBlock[OFFSET(local_size + LID)];
 }
 
 
