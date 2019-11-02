@@ -359,8 +359,8 @@ void CReductionTask::Reduction_LoadMax(cl_context Context, cl_command_queue Comm
 	do
 	{
 		// parameters for this iteration
-		globalWorkSize = nToReduce * myLocalWorkSize / localMemorySize;
-		globalWorkSize = globalWorkSize > 0 ? globalWorkSize : nToReduce;		// reset if too small globalWorkSize
+		int nGroups = nToReduce / localMemorySize;
+		globalWorkSize = nGroups > 0 ? nGroups * myLocalWorkSize : min(nToReduce,(int)myLocalWorkSize);		// reset if too small globalWorkSize
 		myLocalWorkSize = globalWorkSize < myLocalWorkSize ? globalWorkSize : LocalWorkSize[0];
 		// cout << "GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<", nWorkGroups: "<<globalWorkSize/myLocalWorkSize<<endl;
 

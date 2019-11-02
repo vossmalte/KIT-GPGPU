@@ -101,20 +101,24 @@ __kernel void Reduction_LoadMax(const __global uint* inArray, __global uint* out
 {
 	int local_size = get_local_size(0);
 	int LID = get_local_id(0);
+	int groupID = get_group_id(0);
 	int elementsPerWorkItem = maxElements / local_size;
-
+	
 	// initialize localSum
 	if (LID == 0) *localSum = 0;
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	uint workItemSum = 0;
-	//if (0 == (LID|get_group_id(0))) printf("ePWI: %i\n", elementsPerWorkItem);
+	//if (0 == (LID|groupID)) printf("maxEl: %i, ePWI: %i\n", maxElements, elementsPerWorkItem);
 	for (int i = 0; i < elementsPerWorkItem; i++)
-		workItemSum += inArray[LID + i*elementsPerWorkItem];
+		workItemSum += inArray[i*local_size + maxElements*groupID + LID];
+
+	//printf("workItemSum of %i: %i\n", LID, workItemSum);
 
 	atomic_add(localSum, workItemSum);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	// store data:
-	if (LID == 0) outArray[get_group_id(0)] = *localSum;
-
+	if (LID == 0) outArray[groupID] = *localSum;
+	//if (0 == (LID|groupID)) printf("localSum: %i\n", *localSum);
+	//if (0 == LID) printf("localSum: %i\n", *localSum);
 }
