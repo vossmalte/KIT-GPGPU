@@ -104,14 +104,34 @@ __kernel void Scan_WorkEfficient(__global uint* array, __global uint* higherLeve
 	localBlock[OFFSET(LID)] += array[subArrayStart + LID];
 	localBlock[OFFSET(local_size + LID)] += array[subArrayStart + local_size + LID];
 	
-	higherLevelArray[subArrayStart + LID] = localBlock[OFFSET(LID)];
-	higherLevelArray[subArrayStart + local_size + LID] = localBlock[OFFSET(local_size + LID)];
+	array[subArrayStart + LID] = localBlock[OFFSET(LID)];
+	array[subArrayStart + local_size + LID] = localBlock[OFFSET(local_size + LID)];
+
+	// the last result of each group is to be written in the next higher level
+	// last workgroup item is responsible for that
+	if (LID == local_size - 1) {
+		higherLevelArray[get_group_id(0)] = localBlock[OFFSET(local_size + LID)];
+		// printf("%i.", localBlock[OFFSET(local_size + LID)]); 		// debug
+	}
+
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 __kernel void Scan_WorkEfficientAdd(__global uint* higherLevelArray, __global uint* array, __local uint* localBlock) 
 {
-	// TO DO: Kernel implementation (large arrays)
 	// Kernel that should add the group PPS to the local PPS (Figure 14)
+	int LID = get_local_id(0);
+	int GrID = get_group_id(0);
+	int local_size = get_local_size(0);
+
+	if (GrID == 0) {
+		return;			// no add needed
+	} else {
+		uint group_pps = higherLevelArray[GrID - 1];
+		int subArrayStart = GrID * 2 * local_size;
+		// if (LID == 0) printf("%i.", group_pps);		// debug
+		array[subArrayStart + LID] += group_pps;
+		array[subArrayStart + local_size + LID] += group_pps;
+	}
 }

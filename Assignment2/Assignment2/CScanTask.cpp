@@ -62,8 +62,8 @@ bool CScanTask::InitResources(cl_device_id Device, cl_context Context)
 
 	//fill the array with some values
 	for(unsigned int i = 0; i < m_N; i++)
-		m_hArray[i] = 1;			// Use this for debugging
-		//m_hArray[i] = rand() & 15;		// TODO remove debuggin
+		//m_hArray[i] = 1;			// Use this for debugging
+		m_hArray[i] = rand() & 15;		// TODO remove debuggin
 
 	//device resources
 	// ping-pong buffers
@@ -225,20 +225,23 @@ void CScanTask::Scan_Naive(cl_context Context, cl_command_queue CommandQueue, si
 
 void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
-
-	// TO DO: Implement efficient version of scan
 	cl_int clError;
 	size_t myLocalWorkSize = LocalWorkSize[0];
 	size_t globalWorkSize = m_N / 2;
 
+	// cout << "Running Scan in " << m_nLevels << " levels, array size: " << m_N << endl;
+	
+	// this code works for local PPS
+	/*
 	// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
 	// set first argument: pointer of in array
-	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 0, sizeof(cl_mem), (void*) m_dLevelArrays);
-	// set second argument: pointer of out array
-	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 1, sizeof(cl_mem), (void*) m_dLevelArrays);
+	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 0, sizeof(cl_mem), (void*) &m_dLevelArrays[0]);
+	// set second argument: pointer of out higherLevelArray
+	// unsigned int k = m_nLevels > 1 ? 1 : 0;		// pass back to level 0 if local PPS is enough
+	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 1, sizeof(cl_mem), (void*) &m_dLevelArrays[1]);
 	// set third argument: local block
 	size_t size = 2 * myLocalWorkSize;		// number of elements to store
-	size += size/32;						// number of pads
+	size += size/NUM_BANKS;					// number of pads
 	// cout << "LocalBlock size: " << size << endl;
 	clError = clSetKernelArg(m_ScanWorkEfficientKernel, 2, size * sizeof(uint), NULL);
 	V_RETURN_CL(clError, "Failed to set kernel args: ScanWorkEfficient");
@@ -249,10 +252,84 @@ void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQ
 	clError = clEnqueueNDRangeKernel(CommandQueue, m_ScanWorkEfficientKernel, 1, NULL,
 									&globalWorkSize, &myLocalWorkSize,
 									0, NULL, NULL);	
-	V_RETURN_CL(clError, "Failed to execute Kernel: ScanWorkEfficient");
+	V_RETURN_CL(clError, "Failed to execute Kernel: ScanWorkEfficient (Local PPS)");
 	///////////////////////////////////////////////////////////////////////////////////////////
-
+	return;
 	// Make sure that the local prefix sum works before you start experimenting with large arrays
+	// works fine :-)
+	*/
+	
+	// level -1 is just a output for level -2
+	uint i;		// levels we write to
+	for (i = 0; i < m_nLevels - 1; i++) {
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of in array
+		clError = clSetKernelArg(m_ScanWorkEfficientKernel, 0, sizeof(cl_mem), (void*) &m_dLevelArrays[i]);
+		// set second argument: pointer of out higherLevelArray
+		// unsigned int k = m_nLevels == i+1 ? i : i+1;		// pass back to level 0 if local PPS is enough
+		// unsigned int k = min(m_nLevels-1, i+1);			// dont go out of bounds
+		// if i = k: just perform a local PPS. This is the top level
+		clError = clSetKernelArg(m_ScanWorkEfficientKernel, 1, sizeof(cl_mem), (void*) &m_dLevelArrays[i+1]);
+		// set third argument: local block
+		size_t size = 2 * myLocalWorkSize;		// number of elements to store
+		size += size/NUM_BANKS;					// number of pads
+		// cout << "LocalBlock size: " << size << endl;
+		clError = clSetKernelArg(m_ScanWorkEfficientKernel, 2, size * sizeof(uint), NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: ScanWorkEfficient (Group PPS)");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		if (myLocalWorkSize == 0)		// this can happen if globalWorkSize is 1 
+			myLocalWorkSize = 1;
+		// cout << endl << "GROUP PPS: GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<endl;
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_ScanWorkEfficientKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: ScanWorkEfficient (Group PPS)");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		if (globalWorkSize / myLocalWorkSize / 2 <= 1) {
+			// only one result is being written, no PPS needed
+			i++;
+			break;
+		}
+
+		// set parameters for the next step
+		globalWorkSize /= myLocalWorkSize * 2;
+		if (globalWorkSize < myLocalWorkSize) {
+			myLocalWorkSize = globalWorkSize;
+		} 
+	}
+	
+	// now distribute all group prefixes to the elements
+	for (; i>0; i--) {		// reuse the count from above
+		// SET KERNEL ARGUMENTS ///////////////////////////////////////////////////////////////////
+		// set first argument: pointer of higherLevelArray
+		clError = clSetKernelArg(m_ScanWorkEfficientAddKernel, 0, sizeof(cl_mem), (void*) &m_dLevelArrays[i]);
+		// set second argument: pointer of out array 
+		clError = clSetKernelArg(m_ScanWorkEfficientAddKernel, 1, sizeof(cl_mem), (void*) &m_dLevelArrays[i-1]);
+		// set third argument: local block
+		// size_t size = 2 * myLocalWorkSize;		// number of elements to store
+		// size += size/NUM_BANKS;					// number of pads
+		// cout << "LocalBlock size: " << size << endl;
+		// no need for a local block
+		clError = clSetKernelArg(m_ScanWorkEfficientAddKernel, 2, 1, NULL);
+		V_RETURN_CL(clError, "Failed to set kernel args: ScanWorkEfficientAdd");
+		///////////////////////////////////////////////////////////////////////////////////////////
+
+		if (myLocalWorkSize == 0)		// this can happen if globalWorkSize is 1 
+			myLocalWorkSize = 1;
+		// cout << endl << "ADD: GlobalWorkSize: "<<globalWorkSize<<", myLocalWorkSize: "<<myLocalWorkSize<<endl;
+		// RUN KERNEL /////////////////////////////////////////////////////////////////////////////
+		clError = clEnqueueNDRangeKernel(CommandQueue, m_ScanWorkEfficientAddKernel, 1, NULL,
+										&globalWorkSize, &myLocalWorkSize,
+										0, NULL, NULL);	
+		V_RETURN_CL(clError, "Failed to execute Kernel: ScanWorkEfficientAdd");
+		///////////////////////////////////////////////////////////////////////////////////////////
+		myLocalWorkSize = LocalWorkSize[0];
+		globalWorkSize *= 2 * LocalWorkSize[0];
+	}
+
 
 }
 
