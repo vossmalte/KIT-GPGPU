@@ -35,7 +35,7 @@ CConvolutionBilateralTask::CConvolutionBilateralTask(
 	, m_DepthFileName(DepthFileName)
 {
 	m_FileNamePostfix = "Bilateral";
-	m_ProgramName = "ConvolutionBilateral.cl";
+	m_ProgramName = "../Assignment3/ConvolutionBilateral.cl";
 }
 
 CConvolutionBilateralTask::~CConvolutionBilateralTask()
@@ -197,8 +197,8 @@ void CConvolutionBilateralTask::ComputeGPU(cl_context Context, cl_command_queue 
 	V_RETURN_CL( clEnqueueReadBuffer(CommandQueue, m_dDiscBuffer, CL_TRUE, 0, m_Width * m_Height * sizeof(int), 
 		m_hGPUDiscBuffer, 0, NULL, NULL), "Error reading back results from the device!" );
 	
-	SaveImage("Images/GPUResultBilateral.pfm", m_hGPUResultChannels);
-	SaveIntImage("Images/GPUDiscontinuities.pfm", m_hGPUDiscBuffer);
+	SaveImage("../Assignment3/Images/GPUResultBilateral.pfm", m_hGPUResultChannels);
+	SaveIntImage("../Assignment3/Images/GPUDiscontinuities.pfm", m_hGPUDiscBuffer);
 }
 
 void CConvolutionBilateralTask::ComputeCPU()
@@ -261,8 +261,8 @@ void CConvolutionBilateralTask::ComputeCPU()
 	cout<<"  CPU time: "<<runTime<<" ms, throughput: "<< 1.0e-6 * m_Width * m_Height / runTime << " Gpixels/s" <<endl;
 
 	// Store CPU results
-	SaveImage("Images/CPUResultBilateral.pfm", m_hCPUResultChannels);
-	SaveIntImage("Images/CPUDiscontinuities.pfm", m_hCPUDiscBuffer);
+	SaveImage("../Assignment3/Images/CPUResultBilateral.pfm", m_hCPUResultChannels);
+	SaveIntImage("../Assignment3/Images/CPUDiscontinuities.pfm", m_hCPUDiscBuffer);
 }
 
 double CConvolutionBilateralTask::ConvolutionChannelCPU(unsigned int Channel)

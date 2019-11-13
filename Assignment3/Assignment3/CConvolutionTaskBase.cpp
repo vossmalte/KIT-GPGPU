@@ -150,7 +150,7 @@ bool CConvolutionTaskBase::ValidateResults()
 
 	//save difference image
 	std::stringstream strm;
-	strm<<"Images/DifferenceImage"<<m_FileNamePostfix<<".pfm";
+	strm<<"../Assignment3/Images/DifferenceImage"<<m_FileNamePostfix<<".pfm";
 	SaveImage(strm.str().c_str(), m_hCPUResultChannels);
 
 	return (avgError < 1e-10f && maxError < 1e-8);

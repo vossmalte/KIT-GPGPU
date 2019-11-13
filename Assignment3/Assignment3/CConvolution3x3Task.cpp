@@ -70,7 +70,7 @@ bool CConvolution3x3Task::InitResources(cl_device_id Device, cl_context Context)
 
 	string programCode;
 
-	CLUtil::LoadProgramSourceToMemory("Convolution3x3.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment3/Convolution3x3.cl", programCode);
 	m_Program = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(m_Program == nullptr) return false;
 
@@ -125,7 +125,7 @@ void CConvolution3x3Task::ComputeGPU(cl_context Context, cl_command_queue Comman
 	}
 
 
-	SaveImage("Images/GPUResult3x3.pfm", m_hGPUResultChannels);
+	SaveImage("../Assignment3/Images/GPUResult3x3.pfm", m_hGPUResultChannels);
 }
 
 void CConvolution3x3Task::ComputeCPU()
@@ -142,7 +142,7 @@ void CConvolution3x3Task::ComputeCPU()
 
 	cout<<"  CPU time: "<<runTime<<" ms, throughput: "<< 1.0e-6 * m_Width * m_Height / runTime << " Gpixels/s" <<endl;
 
-	SaveImage("Images/CPUResult3x3.pfm", m_hCPUResultChannels);
+	SaveImage("../Assignment3/Images/CPUResult3x3.pfm", m_hCPUResultChannels);
 }
 
 double CConvolution3x3Task::ConvolutionChannelCPU(unsigned int Channel)

@@ -35,7 +35,7 @@ bool CAssignment3::DoCompute()
 			{ -1.0f / 8.0f,  1.0f,        -1.0f / 8.0f },
 			{ -1.0f / 8.0f, -1.0f / 8.0f, -1.0f / 8.0f },
 		};
-		CConvolution3x3Task convTask("Images/input.pfm", TileSize, ConvKernel, true, 0.0f);
+		CConvolution3x3Task convTask("../Assignment3/Images/input.pfm", TileSize, ConvKernel, true, 0.0f);
 		RunComputeTask(convTask, TileSize);
 	}
 
@@ -53,7 +53,7 @@ bool CAssignment3::DoCompute()
 			for(int i = 0; i < 9; i++)
 				ConvKernel[i] = 1.0f / 9.0f;
 
-			CConvolutionSeparableTask convTask("box_4x4", "Images/input.pfm", HGroupSize, VGroupSize,
+			CConvolutionSeparableTask convTask("box_4x4", "../Assignment3/Images/input.pfm", HGroupSize, VGroupSize,
 				4, 4, 4, ConvKernel, ConvKernel);
 			// note: the last argument is ignored, but our framework requires it
 			// for the horizontal and vertical passes different local sizes might be used
@@ -66,7 +66,7 @@ bool CAssignment3::DoCompute()
 			for(int i = 0; i < 17; i++)
 				ConvKernel[i] = 1.0f / 17.0f;
 
-			CConvolutionSeparableTask convTask("box_8x8", "Images/input.pfm", HGroupSize, VGroupSize,
+			CConvolutionSeparableTask convTask("box_8x8", "../Assignment3/Images/input.pfm", HGroupSize, VGroupSize,
 				4, 4, 8, ConvKernel, ConvKernel);
 			RunComputeTask(convTask, HGroupSize);
 		}
@@ -76,7 +76,7 @@ bool CAssignment3::DoCompute()
 			float ConvKernel[7] = {
 				0.000817774f, 0.0286433f, 0.235018f, 0.471041f, 0.235018f, 0.0286433f, 0.000817774f
 			};
-			CConvolutionSeparableTask convTask("gauss_3x3", "Images/input.pfm", HGroupSize, VGroupSize,
+			CConvolutionSeparableTask convTask("gauss_3x3", "../Assignment3/Images/input.pfm", HGroupSize, VGroupSize,
 				4, 4, 3, ConvKernel, ConvKernel);
 			RunComputeTask(convTask, HGroupSize);
 		}
@@ -91,7 +91,7 @@ bool CAssignment3::DoCompute()
 
 		float ConvKernel[9] = {0.010284844f,	0.0417071f,	0.113371652f,	0.206576619f,	0.252313252f,	0.206576619f,	0.113371652f,	0.0417071f,	0.010284844f};
 
-		CConvolutionBilateralTask convTask("Images/color.pfm", "Images/normals.pfm", "Images/depth.pfm", HGroupSize, VGroupSize,
+		CConvolutionBilateralTask convTask("../Assignment3/Images/color.pfm", "../Assignment3/Images/normals.pfm", "../Assignment3/Images/depth.pfm", HGroupSize, VGroupSize,
 			4, 4, 4, ConvKernel, ConvKernel);
 		RunComputeTask(convTask, HGroupSize);
 	}
@@ -101,12 +101,12 @@ bool CAssignment3::DoCompute()
 	{
 		size_t group_size[2] = {16, 16};
 		{
-			CHistogramTask histogram(0.25f, 0.26f, false, "Images/input.pfm");
+			CHistogramTask histogram(0.25f, 0.26f, false, "../Assignment3/Images/input.pfm");
 			RunComputeTask(histogram, group_size);
 		}
 
 		{
-			CHistogramTask histogram(0.25f, 0.26f, true, "Images/input.pfm");
+			CHistogramTask histogram(0.25f, 0.26f, true, "../Assignment3/Images/input.pfm");
 			RunComputeTask(histogram, group_size);
 		}
 	}

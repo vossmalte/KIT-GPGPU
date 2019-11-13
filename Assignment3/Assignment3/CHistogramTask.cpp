@@ -57,7 +57,7 @@ InitResources(cl_device_id dev, cl_context ctx)
 
 
 	std::string src;
-	if(!CLUtil::LoadProgramSourceToMemory("histogram.cl", src))
+	if(!CLUtil::LoadProgramSourceToMemory("../Assignment3/histogram.cl", src))
 		return false;
 
 	m_program = CLUtil::BuildCLProgramFromMemory(dev, ctx, src);

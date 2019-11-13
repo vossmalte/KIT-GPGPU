@@ -48,7 +48,7 @@ CConvolutionSeparableTask::CConvolutionSeparableTask(
 	m_hCPUWorkingBuffer = nullptr;
 
 	m_FileNamePostfix = "Separable_" + OutFileName;
-	m_ProgramName = "ConvolutionSeparable.cl";
+	m_ProgramName = "../Assignment3/ConvolutionSeparable.cl";
 }
 
 CConvolutionSeparableTask::~CConvolutionSeparableTask()
@@ -169,7 +169,7 @@ void CConvolutionSeparableTask::ComputeGPU(cl_context Context, cl_command_queue 
 
 	}
 	
-	SaveImage("Images/GPUResultSeparable_" + m_OutFileName + ".pfm", m_hGPUResultChannels);
+	SaveImage("../Assignment3/Images/GPUResultSeparable_" + m_OutFileName + ".pfm", m_hGPUResultChannels);
 }
 
 void CConvolutionSeparableTask::ComputeCPU()
@@ -182,7 +182,7 @@ void CConvolutionSeparableTask::ComputeCPU()
 
 	cout<<"  CPU time: "<<runTime<<" ms, throughput: "<< 1.0e-6 * m_Width * m_Height / runTime << " Gpixels/s" <<endl;
 
-	SaveImage("Images/CPUResultSeparable_" + m_OutFileName + ".pfm", m_hCPUResultChannels);
+	SaveImage("../Assignment3/Images/CPUResultSeparable_" + m_OutFileName + ".pfm", m_hCPUResultChannels);
 }
 
 double CConvolutionSeparableTask::ConvolutionChannelCPU(unsigned int Channel)
