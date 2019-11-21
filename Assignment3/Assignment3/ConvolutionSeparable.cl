@@ -148,7 +148,7 @@ void ConvVertical(
 	if (baseY == 0) {
 		tile[LID.y][LID.x] = 0;
 	} else {
-		tile[LID.y][LID.x] = d_Src[(baseY + LID.y) * Pitch + GID.x];
+		tile[LID.y][LID.x] = d_Src[(baseY - V_GROUPSIZE_Y + LID.y) * Pitch + GID.x];
 	}
 
 	for (int tileID = 1; tileID < V_RESULT_STEPS + 2; tileID++) {
@@ -183,7 +183,7 @@ void ConvVertical(
 		// store
 		if (global_y < Height) {				// pixel readable
 			//if (LID.x==0 ||LID.y == 0) px = 1;
-			if ((LID.x==0 ||LID.y == 0)&&tileID==1) px = 0;
+			//if ((LID.x==0 ||LID.y == 0)&&tileID==1) px = 0;
 			d_Dst[global_y * Pitch + GID.x] = px;
 			//d_Dst[global_y * Pitch + GID.x] = tile[local_y][LID.x];
 			//d_Dst[global_y * Pitch + GID.x] = d_Src[global_y * Pitch + GID.x];		// no conv
