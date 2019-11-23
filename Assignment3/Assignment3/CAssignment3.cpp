@@ -82,7 +82,7 @@ bool CAssignment3::DoCompute()
 		}
 	}
 
-
+	if(false) {
 	cout<<endl<<"########################################"<<endl;
 	cout<<"Task 3: Separable bilateral convolution"<<endl<<endl;
 	{
@@ -94,6 +94,7 @@ bool CAssignment3::DoCompute()
 		CConvolutionBilateralTask convTask("../Assignment3/Images/color.pfm", "../Assignment3/Images/normals.pfm", "../Assignment3/Images/depth.pfm", HGroupSize, VGroupSize,
 			4, 4, 4, ConvKernel, ConvKernel);
 		RunComputeTask(convTask, HGroupSize);
+	}
 	}
 
 	cout<<endl<<"########################################"<<endl;
