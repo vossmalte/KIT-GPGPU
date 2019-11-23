@@ -82,7 +82,7 @@ void ConvHorizontal(
 		if (global_x < Width) {				// pixel readable
 			tile[LID.y][LID.x+tileID*H_GROUPSIZE_X] = d_Src[GID.y * Pitch + global_x];
 		} else {	// right most group -> touches right bound
-			tile[LID.y][LID.x+tileID*H_GROUPSIZE_X] = 1;
+			tile[LID.y][LID.x+tileID*H_GROUPSIZE_X] = 0;
 		}
 		// if (GID.x + GID.y == 3) printf("%i ", global_x);
 	}
@@ -91,20 +91,20 @@ void ConvHorizontal(
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// Convolve and store the result
-	if (GID.x + GID.y == 0) printf("Steps %i\n", H_RESULT_STEPS);
+	// if (GID.x + GID.y == 0) printf("Steps %i\n", H_RESULT_STEPS);
 	for (int tileID = 1; tileID < H_RESULT_STEPS + 1; tileID++) {
-		if (GID.x + GID.y == 0) printf("Tile %i: ", tileID);
+		// if (GID.x + GID.y == 0) printf("Tile %i: ", tileID);
 		int global_x = baseX + (tileID-1)*H_GROUPSIZE_X + LID.x;
 		int local_x = tileID*H_GROUPSIZE_X + LID.x;
 
 		// convolve:
 		__private float px = 0;
 		for (int i = 0; i < KERNEL_LENGTH; i++) {
-			if (GID.x + GID.y == 0) printf("%.1f ",c_Kernel[i]);
+			// if (GID.x + GID.y == 0) printf("%.1f ",c_Kernel[i]);
 			px += c_Kernel[i] * tile[LID.y][local_x - KERNEL_RADIUS + i];
 		}
 
-		if (GID.x + GID.y == 0) printf("result: %.1f \n", px);
+		// if (GID.x + GID.y == 0) printf("result: %.1f \n", px);
 		// store
 		if (global_x < Width && GID.y < 575) {				// pixel readable
 			//if (global_x == 779) printf("(%i,%i):%.1f\n", GID, px);
@@ -113,7 +113,7 @@ void ConvHorizontal(
 			//d_Dst[GID.y * Pitch + global_x] = d_Src[GID.y * Pitch + global_x];		// no conv
 		}
 	}
-	if (GID.x + GID.y == 0) printf("Horizontal conv finished\n");
+	// if (GID.x + GID.y == 0) printf("Horizontal conv finished\n");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,19 +166,19 @@ void ConvVertical(
 	// Compute and store results
 	// Convolve and store the result
 
-	if (GID.x + GID.y == 0) printf("Steps %i\n", V_RESULT_STEPS);
+	// if (GID.x + GID.y == 0) printf("Steps %i\n", V_RESULT_STEPS);
 	for (int tileID = 1; tileID < V_RESULT_STEPS + 1; tileID++) {
-		if (GID.x + GID.y == 0) printf("Tile %i: ", tileID);
+		// if (GID.x + GID.y == 0) printf("Tile %i: ", tileID);
 		int global_y = baseY + (tileID-1)*V_GROUPSIZE_Y + LID.y;
 		int local_y = tileID*V_GROUPSIZE_Y + LID.y;
 
 		// convolve:
 		float px = 0;
 		for (int i = 0; i < KERNEL_LENGTH; i++) {
-			if (GID.x + GID.y == 0) printf("%.1f ",c_Kernel[i]);
+			// if (GID.x + GID.y == 0) printf("%.1f ",c_Kernel[i]);
 			px += c_Kernel[i] * tile[local_y - KERNEL_RADIUS + i][LID.x];
 		}
-		if (GID.x + GID.y == 0) printf("result(%i): %.1f \n", local_y,px);
+		// if (GID.x + GID.y == 0) printf("result(%i): %.1f \n", local_y,px);
 
 		// store
 		if (global_y < Height) {				// pixel readable
@@ -189,5 +189,5 @@ void ConvVertical(
 			//d_Dst[global_y * Pitch + GID.x] = d_Src[global_y * Pitch + GID.x];		// no conv
 		}
 	}
-	if (GID.x + GID.y == 0) printf("Vertical conv finished\n");
+	// if (GID.x + GID.y == 0) printf("Vertical conv finished\n");
 }
