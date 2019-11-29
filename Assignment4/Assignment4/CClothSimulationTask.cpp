@@ -60,14 +60,14 @@ bool CClothSimulationTask::InitResources(cl_device_id Device, cl_context Context
 
 	//load cloth texture
 	m_pClothTexture = new CGLTexture();
-	if(!m_pClothTexture->loadTGA("Assets/clothTexture.tga"))
+	if(!m_pClothTexture->loadTGA("../Assignment4/Assets/clothTexture.tga"))
 	{
 		cout<<"Failed to load cloth texture"<<endl;
 		return false;
 	}
 
 	//load environment
-	m_pEnvironment = CTriMesh::LoadFromObj("clothscene.obj", hlsl::identity<float,4,4>());
+	m_pEnvironment = CTriMesh::LoadFromObj("../Assignment4/clothscene.obj", hlsl::identity<float,4,4>());
 	if(!m_pEnvironment)
 	{
 		cout<<"Failed to create cloth environment."<<endl;
@@ -89,10 +89,10 @@ bool CClothSimulationTask::InitResources(cl_device_id Device, cl_context Context
 	m_VSCloth = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 	m_PSCloth = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-	if(!CreateShaderFromFile("meshtextured.vert", m_VSCloth))
+	if(!CreateShaderFromFile("../Assignment4/meshtextured.vert", m_VSCloth))
 		return false;
 
-	if(!CreateShaderFromFile("meshtextured.frag", m_PSCloth))
+	if(!CreateShaderFromFile("../Assignment4/meshtextured.frag", m_PSCloth))
 		return false;
 
 	m_ProgRenderCloth = glCreateProgramObjectARB();
@@ -105,10 +105,10 @@ bool CClothSimulationTask::InitResources(cl_device_id Device, cl_context Context
 	m_VSMesh = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 	m_PSMesh = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-	if(!CreateShaderFromFile("mesh.vert", m_VSMesh))
+	if(!CreateShaderFromFile("../Assignment4/mesh.vert", m_VSMesh))
 		return false;
 
-	if(!CreateShaderFromFile("mesh.frag", m_PSMesh))
+	if(!CreateShaderFromFile("../Assignment4/mesh.frag", m_PSMesh))
 		return false;
 
 	m_ProgRenderMesh = glCreateProgramObjectARB();
@@ -147,7 +147,7 @@ bool CClothSimulationTask::InitResources(cl_device_id Device, cl_context Context
 	V_RETURN_FALSE_CL(clError, "Error allocating device arrays.");
 
 	string programCode;
-	CLUtil::LoadProgramSourceToMemory("clothsim.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment4/clothsim.cl", programCode);
 	m_ClothSimProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(m_ClothSimProgram == nullptr)
 		return false;

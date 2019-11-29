@@ -46,9 +46,9 @@ CAssignment4::CAssignment4()
 	cout<<"########################################"<<endl;
 	cout<<"TASK 1: Particle System"<<endl<<endl;
 
-	std::string meshPath = "Assets/cubeJump.obj";
+	std::string meshPath = "../Assignment4/Assets/cubeJump.obj";
 	// Uncomment this to test your application with more triangles!
-	// meshPath = "Assets/cubeMonkey.obj";
+	// meshPath = "../Assignment4/Assets/cubeMonkey.obj";
 
 	m_LocalWorkSize[0] = 192;
 	m_LocalWorkSize[1] = 1;

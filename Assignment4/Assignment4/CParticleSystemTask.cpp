@@ -219,10 +219,10 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 	m_VSMesh = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 	m_PSMesh = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-	if(!CreateShaderFromFile("mesh.vert", m_VSMesh))
+	if(!CreateShaderFromFile("../Assignment4/mesh.vert", m_VSMesh))
 		return false;
 
-	if(!CreateShaderFromFile("mesh.frag", m_PSMesh))
+	if(!CreateShaderFromFile("../Assignment4/mesh.frag", m_PSMesh))
 		return false;
 
 	m_ProgRenderMesh = glCreateProgramObjectARB();
@@ -234,10 +234,10 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 	m_VSParticles = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 	m_PSParticles = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-	if(!CreateShaderFromFile("particles.vert", m_VSParticles))
+	if(!CreateShaderFromFile("../Assignment4/particles.vert", m_VSParticles))
 		return false;
 	
-	if(!CreateShaderFromFile("particles.frag", m_PSParticles))
+	if(!CreateShaderFromFile("../Assignment4/particles.frag", m_PSParticles))
 		return false;
 
 	m_ProgRenderParticles = glCreateProgramObjectARB();
@@ -253,10 +253,10 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 	m_VSForceField = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 	m_PSForceField = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-	if(!CreateShaderFromFile("forcefield.vert", m_VSForceField))
+	if(!CreateShaderFromFile("../Assignment4/forcefield.vert", m_VSForceField))
 		return false;
 
-	if(!CreateShaderFromFile("forcefield.frag", m_PSForceField))
+	if(!CreateShaderFromFile("../Assignment4/forcefield.frag", m_PSForceField))
 		return false;
 
     CHECK_FOR_OGL_ERROR();
@@ -273,7 +273,7 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 
 	// Particle kernels
 	string programCode;
-	CLUtil::LoadProgramSourceToMemory("ParticleSystem.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment4/ParticleSystem.cl", programCode);
 	m_PSystemProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(!m_PSystemProgram)
 		return false;
@@ -286,7 +286,7 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 	V_RETURN_FALSE_CL(clError, "Failed to create Reorganize kernel.");
 
 	// Scan kernels
-	CLUtil::LoadProgramSourceToMemory("Scan.cl", programCode);
+	CLUtil::LoadProgramSourceToMemory("../Assignment4/Scan.cl", programCode);
 	m_ScanProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
 	if(!m_ScanProgram)
 		return false;
@@ -300,7 +300,7 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 
 	// Load volume data
 	m_volumeRes[0] = m_volumeRes[1] = m_volumeRes[2] = 128;
-	FILE *fin = fopen("Assets/helix_float.raw", "rb");
+	FILE *fin = fopen("../Assignment4/Assets/helix_float.raw", "rb");
 	if (!fin) {
 		cout << "Unable to open volumetric data file." << endl;
 		return false;
