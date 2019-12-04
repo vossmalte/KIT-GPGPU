@@ -100,6 +100,29 @@ bool CheckCollisions(	float4 x0, float4 x1,
 	//	Iterate over the triangles in the cache and test for the intersection
 	//	nProcessed += k;  
 	//}
+
+	uint local_size = get_local_size(0);	// 192
+	uint nProcessed = 0;  
+	while (nProcessed < 3*nTriangles) {
+		// write into cache
+		if (get_local_id(0) + nProcessed < 3*nTriangles)
+			lTriangleCache[get_local_id(0)] = gTriangleSoup[get_local_id(0) + nProcessed];
+
+		// wait for all threads to write
+		barrier(CLK_LOCAL_MEM_FENCE);
+
+		// Iterate over the triangles in the cache and test for the intersection
+		for (uint i = 0; i < min(local_size, 3*nTriangles-nProcessed); i+=3) {
+			// TODO: use closest intersection if possible
+			if (LineTriangleIntersection(x0,x1,
+										lTriangleCache[i], lTriangleCache[i+1], lTriangleCache[i+2],
+										t, n)) {
+				return true;
+										}
+		}
+		nProcessed += local_size;
+		//if (get_global_id(0) == 0) printf("%i / %i\n", nProcessed, nTriangles);  
+	}
 	return false;
 
 }
@@ -156,16 +179,51 @@ __kernel void Integrate(__global uint *gAlive,
 
 	// ADD YOUR CODE HERE (INSTEAD OF THE LINES BELOW) 
 	// to finish the implementation of the Verlet Velocity Integration
+	/*
 	x0.y = 0.2f * sin(x0.w * 5.f) + 0.3f;
 	x0.w -= dT;
 	gPosLife[get_global_id(0)] = x0;
+	*/
+
+	// calculate combined force
+	float4 F = gAccel + F0;
+
+	// next position
+	float4 x1 = x0 + v0*dT + 0.5f*F/mass*dT*dT;
+	x1.w = 0.;
+	float4 F1 = read_imagef(gForceField, sampler, x1);
+	float4 v1 = v0 + 0.5f*(F0+F1+2.f*gAccel)/mass*dT;
 	
+	// reduce life time by timestep
+	life -= dT;
 	
 	// Check for collisions and correct the position and velocity of the particle if it collides with a triangle
 	// - Don't forget to offset the particles from the surface a little bit, otherwise they might get stuck in it.
 	// - Dampen the velocity (e.g. by a factor of 0.7) to simulate dissipation of the energy.
+	float t;	// intersection parameter
+	float4 n;	// normal at the intersection
+	if (CheckCollisions(x0, x1, gTriangleSoup, lTriangleCache, nTriangles, &t, &n)) {
+		// if there is a collision
+		// reset position
+		x1 = x0 + (1.0f - 0.5f) * t*(x1-x0);
+		x1 = (0.5f,0.5f,0.5f,100.f);
+		// dampen velocity
+		v0 *= 0.7f;
+		// reflect:
+		v1 = 2.0f * dot3(v1,n) * n - v1;
+	}
 	
 	// Kill the particle if its life is < 0.0 by setting the corresponding flag in gAlive to 0.
+	if (life < 0.0) {
+		// prinf("Killed particle %i\n", get_global_id(0));
+		*gAlive = 0;
+	}
+
+	// write back to global memory
+	x1.w = life;
+	gPosLife[get_global_id(0)] = x1;
+	v1.w = mass;
+	gVelMass[get_global_id(0)] = v1;
 
 	// Independently of the status of the particle, possibly create a new one.
 	// For instance, if the particle gets too fast (or too high, or passes through some region), it is split into two...
