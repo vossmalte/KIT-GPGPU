@@ -1,6 +1,7 @@
 #define DAMPING 0.02f
 
 #define G_ACCEL (float4)(0.f, -9.81f, 0.f, 0.f)
+#define ZERO 	(float4)(0.f, 0.f, 0.f, 0.f)
 
 #define WEIGHT_ORTHO	0.138f
 #define WEIGHT_DIAG		0.097f
@@ -39,21 +40,46 @@
 							
 	// Make sure the work-item does not map outside the cloth
     if(get_global_id(0) >= width || get_global_id(1) >= height)
+	{
+		printf("(%i, %i) is not executing anything\n", get_global_id(0), get_global_id(1));
 		return;
+	}
 
 	unsigned int particleID = get_global_id(0) + get_global_id(1) * width;
 	// This is just to keep every 8th particle of the first row attached to the bar
     if(particleID > width-1 || ( particleID & ( 7 )) != 0){
+		if (simulationTime < 0.01) {
+			// initiate the prevPos
+			//printf("initiating prevPos\n");
+			d_prevPos[particleID] = d_pos[particleID];
+		}
+		if (get_global_id(0) == 2 && get_global_id(1) == 3) {
+			//printf("simulationtime: %.2f, elapsed time: %.2f\n", simulationTime, elapsedTime);
+			printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
+		}
+		if (particleID == width)
+		//printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
+		;
 
 
 		// ADD YOUR CODE HERE!
 
 		// Read the positions
 		// Compute the new one position using the Verlet position integration, taking into account gravity and wind
+		// velocity integration: p1 = p0 + v0*dt + 0.5a0*dt^2
+		// position integration:
+		// https://www.lonesock.net/article/verlet.html
+		// xi+1 = xi + (xi - xi-1) * (dti / dti-1) + a * dti * dti
+		float4 pos = d_pos[particleID] + (d_pos[particleID] - d_prevPos[particleID])*elapsedTime + G_ACCEL*elapsedTime*elapsedTime;
 		// Move the value from d_pos into d_prevPos and store the new one in d_pos
+		d_prevPos[particleID] = d_pos[particleID];
+		d_pos[particleID] = pos;
 
 
-    }
+    } else {
+		// this is a particle at the bar
+		d_prevPos[particleID] = d_pos[particleID];
+	}
 }
 
 
@@ -69,6 +95,8 @@
   float4 SatisfyConstraint(float4 pos1,
 						 float4 pos2,
 						 float restDistance){
+	if (dot(pos2,pos2) == 0.f)	// dont do anything if all zero
+		return ZERO;
 	float4 toNeighbor = pos2 - pos1;
 	return (toNeighbor - normalize(toNeighbor) * restDistance);
 }
@@ -94,13 +122,126 @@ __kernel void SatisfyConstraints(unsigned int width,
 								__global float4* d_posOut,
 								__global float4 const * d_posIn){
     
+    // Make sure the work-item does not map outside the cloth
     if(get_global_id(0) >= width || get_global_id(1) >= height)
+	{
+		printf("(%i, %i) is not executing anything\n", get_global_id(0), get_global_id(1));
 		return;
+	}
+		
+
+	//int TILE_X = get_local_size(0);
+	//int TILE_Y = get_local_size(1);
+
+	// use local memory as cache:
+	// halo of width 2
+	__local float4 tile[TILE_Y+4][TILE_X+4];
+
+	int2 LID;
+	LID.x = get_local_id(0);
+	LID.y = get_local_id(1);
+
+	int2 GrID;
+	GrID.x = get_group_id(0);
+	GrID.y = get_group_id(1);
+
+	unsigned int particleID = get_global_id(0) + get_global_id(1) * width;
+
+	// Fill the halo with zeros
+	tile[LID.y][LID.x] = ZERO;
+	tile[LID.y+4][LID.x+4] = ZERO;
+	tile[LID.y+4][LID.x] = ZERO;
+	tile[LID.y][LID.x+4] = ZERO;
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+	// Load main filtered area from d_posIn
+	tile[2 + LID.y][2 + LID.x] = d_posIn[particleID];
+
+	
+	// write halo
+	bool readLeftHalo = GrID.x > 0;
+	bool readRightHalo = GrID.x * TILE_X < get_num_groups(0) - 1;
+	bool readUpperHalo = GrID.y > 0;
+	bool readLowerHalo = GrID.y < get_num_groups(1) - 1;
+
+	if (readUpperHalo && LID.y <= 1){		// first row
+		tile[0][LID.x + 1] = d_posIn[particleID - (2-LID.y)*width];
+	}
+	if (readLowerHalo && LID.y >= TILE_Y - 2) {			// last row
+		tile[TILE_Y + 2][LID.x + 2] = d_posIn[particleID + (LID.y - TILE_Y + 3)*width];
+	}
+	if (readRightHalo && LID.x >= TILE_X - 2) {			// last column halo
+		tile[LID.y + 2][TILE_X + 2] = d_posIn[particleID + (LID.x - TILE_X + 3)];
+	}
+	if (readLeftHalo && LID.x <= 1) {					// first column halo
+		tile[LID.y + 2][0] = d_posIn[particleID - 2 + LID.x];
+	}
+
+	// write corners
+	if (LID.y <= 1 && LID.y <= 1) {		// upper left 2x2 writes all corners. no optimization for only 4 writes
+		if (readLeftHalo) {
+			if (readUpperHalo)			// => upper left
+				tile[LID.y][LID.x] = d_posIn[particleID - 2 + LID.x - (2-LID.y)*width];
+			if (readLowerHalo)			// => lower left
+				tile[TILE_Y + 2 + LID.y][LID.x] = d_posIn[particleID - 2 + LID.x + (TILE_Y + LID.y) *width];
+		}
+		if (readRightHalo) {
+			if (readUpperHalo)			// => upper right
+				tile[LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID - (2-LID.y)* width + 1 + LID.x];
+			if (readLowerHalo)			// => lower right
+				tile[TILE_Y + 2 + LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID - (TILE_Y + LID.y) *width + 1 + LID.x];
+		}
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("Loaded tile into local memory\n");
 
 
 	// ADD YOUR CODE HERE!
 	// Satisfy all the constraints (structural, shear, and bend).
 	// You can use weights defined at the beginning of this file.
+
+	float4 thisPos = tile[LID.y + 2][LID.x + 2];
+	float4 cumulatedCorrection = ZERO;
+	// This is just to keep every 8th particle of the first row attached to the bar
+    if(particleID > width-1 || ( particleID & ( 7 )) != 0){
+
+		// structural constraints
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 1][LID.x + 2], restDistance) * WEIGHT_ORTHO;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 - 1], restDistance) * WEIGHT_ORTHO;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 + 1], restDistance) * WEIGHT_ORTHO;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2], restDistance) * WEIGHT_ORTHO;
+		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("structural\n");
+
+		// shear constraints
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 1][LID.x + 2 - 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 1][LID.x + 2 + 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2 - 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2 + 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
+		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("shear\n");
+
+		// bend constraints
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 - 2], restDistance*2.f) * WEIGHT_ORTHO_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 2][LID.x + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
+		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("bend\n");
+
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2 + 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2 - 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 2][LID.x + 2 + 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
+		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 2][LID.x + 2 - 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
+
+		
+	}
+
+	if (get_global_id(0) == 2 && get_global_id(1) == 3) {
+			//printf("simulationtime: %.2f, elapsed time: %.2f\n", simulationTime, elapsedTime);
+			printf("%.2f, %.2f, %.2f, %.2f\n", cumulatedCorrection);
+		}
+
+	d_posOut[particleID] = thisPos + cumulatedCorrection;
 
 	// A ping-pong scheme is needed here, so read the values from d_posIn and store the results in d_posOut
 
@@ -130,7 +271,18 @@ __kernel void CheckCollisions(unsigned int width,
 	// ADD YOUR CODE HERE!
 	// Find whether the particle is inside the sphere.
 	// If so, push it outside.
+	// Make sure the work-item does not map outside the cloth
+    if(get_global_id(0) >= width || get_global_id(1) >= height)
+		return;
 
+	unsigned int particleID = get_global_id(0) + get_global_id(1) * width;
+	// This is just to keep every 8th particle of the first row attached to the bar
+    if(particleID > width-1 || ( particleID & ( 7 )) != 0){
+		if (dot(d_pos[particleID] - spherePos, d_pos[particleID] - spherePos) < sphereRad * sphereRad) {
+			// collision
+			d_pos[particleID] = spherePos + normalize(d_pos[particleID] - spherePos) * sphereRad;
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

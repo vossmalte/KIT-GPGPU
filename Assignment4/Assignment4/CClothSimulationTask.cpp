@@ -245,6 +245,8 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 	globalWorkSize[0] = CLUtil::GetGlobalWorkSize(m_ClothResX, LocalWorkSize[0]);
 	globalWorkSize[1] = CLUtil::GetGlobalWorkSize(m_ClothResY, LocalWorkSize[1]);
 
+	//cout << "Executing " << globalWorkSize[0] << "x" << globalWorkSize[1] << " threads in groups of size " << LocalWorkSize[0] << "x" << LocalWorkSize[1] << endl;
+
 	glFinish();
 	V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clPosArray, 0, NULL, NULL),  "Error acquiring OpenGL vertex buffer.");
 	V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNormalArray, 0, NULL, NULL), "Error acquiring OpenGL normal buffer.");
@@ -261,9 +263,18 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 
 	// ADD YOUR CODE HERE
 
+	
 	// Execute the integration kernel
+	clErr = clEnqueueNDRangeKernel(CommandQueue, m_IntegrateKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+	V_RETURN_CL(clErr, "Error executing integration kernel");
 
 	// Check for collisions
+	clErr  = clSetKernelArg(m_CollisionsKernel, 3, sizeof(cl_float4), (void*) &m_SpherePos);
+	clErr |= clSetKernelArg(m_CollisionsKernel, 4, sizeof(cl_float), (void*) &m_SphereRadius);
+	V_RETURN_CL(clErr, "Failed to set collision kernel params");
+	clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+	//cout << clErr << endl;
+	V_RETURN_CL(clErr, "Error executing collision kernel");
 	
 	// Constraint relaxation: use the ping-pong technique and perform the relaxation in several iterations
 	//for (unsigned int i = 0; i < 2.0 * m_ClothResX; i++){
@@ -276,6 +287,28 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 	//	 Swap the ping pong buffers
 	//}
 
+	//for (unsigned int i = 0; i < 2.0 * m_ClothResX; i++){
+	for (unsigned int i = 0; i < 2; i++){
+		clErr |= clSetKernelArg(m_ConstraintKernel, 3, sizeof(cl_mem), (void*) &m_clPosArrayAux);
+		clErr |= clSetKernelArg(m_ConstraintKernel, 4, sizeof(cl_mem), (void*) &m_clPosArray);
+		V_RETURN_CL(clErr, "Failed to set constraint kernel params");
+		//Execute the constraint relaxation kernel
+		clErr = clEnqueueNDRangeKernel(CommandQueue, m_ConstraintKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+		V_RETURN_CL(clErr, "Error executing constraint kernel %i");
+	
+		if(i % 3 == 0) {
+			//clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+			V_RETURN_CL(clErr, "Error executing collision kernel in loop");
+		}
+		//clErr = clFinish(CommandQueue);
+		//V_RETURN_CL(clErr, "Error waiting");
+	
+		swap(m_clPosArray, m_clPosArrayAux);
+		if (i % 2) cout << "."; else cout << ",";
+	}
+	cout << endl;
+	
+
 	// You can check for collisions here again, to make sure there is no intersection with the cloth in the end
 
 
@@ -283,6 +316,9 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 	//compute correct normals
 	clErr = clEnqueueNDRangeKernel(CommandQueue, m_NormalKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
 	V_RETURN_CL(clErr, "Error executing normal computation kernel");
+
+	clErr = clFinish(CommandQueue);
+	//V_RETURN_CL(clErr, "Error waiting");
 
 
 	V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clPosArray, 0, NULL, NULL),  "Error releasing OpenGL vertex buffer.");
