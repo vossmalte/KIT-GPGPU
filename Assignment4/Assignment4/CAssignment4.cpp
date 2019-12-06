@@ -139,7 +139,7 @@ bool CAssignment4::InitCLContext()
 
 	cl_device_type deviceType = CL_DEVICE_TYPE_GPU;
 
-	for (size_t i = 0; i < platformIds.size(); i++)
+	for (size_t i = 1; i < platformIds.size(); i++)
 	{
 		// Getting the available devices.
 		cl_uint countDevices;
