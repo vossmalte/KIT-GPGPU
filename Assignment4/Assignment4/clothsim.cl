@@ -55,7 +55,7 @@
 		}
 		if (get_global_id(0) == 2 && get_global_id(1) == 3) {
 			//printf("simulationtime: %.2f, elapsed time: %.2f\n", simulationTime, elapsedTime);
-			printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
+			//printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
 		}
 		if (particleID == width)
 		//printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
@@ -95,7 +95,7 @@
   float4 SatisfyConstraint(float4 pos1,
 						 float4 pos2,
 						 float restDistance){
-	if (dot(pos2,pos2) == 0.f)	// dont do anything if all zero
+	if (dot(pos2,pos2) <= 0.001f)	// dont do anything if all zero
 		return ZERO;
 	float4 toNeighbor = pos2 - pos1;
 	return (toNeighbor - normalize(toNeighbor) * restDistance);
@@ -160,42 +160,44 @@ __kernel void SatisfyConstraints(unsigned int width,
 	
 	// write halo
 	bool readLeftHalo = GrID.x > 0;
-	bool readRightHalo = GrID.x * TILE_X < get_num_groups(0) - 1;
+	bool readRightHalo = GrID.x < get_num_groups(0) - 1;
 	bool readUpperHalo = GrID.y > 0;
 	bool readLowerHalo = GrID.y < get_num_groups(1) - 1;
 
+	
+
 	if (readUpperHalo && LID.y <= 1){		// first row
-		tile[0][LID.x + 1] = d_posIn[particleID - (2-LID.y)*width];
+		//tile[LID.y][LID.x + 2] = d_posIn[particleID - 2*width];
 	}
 	if (readLowerHalo && LID.y >= TILE_Y - 2) {			// last row
-		tile[TILE_Y + 2][LID.x + 2] = d_posIn[particleID + (LID.y - TILE_Y + 3)*width];
+		//tile[LID.y + 4][LID.x + 2] = d_posIn[particleID + 2*width];
 	}
 	if (readRightHalo && LID.x >= TILE_X - 2) {			// last column halo
-		tile[LID.y + 2][TILE_X + 2] = d_posIn[particleID + (LID.x - TILE_X + 3)];
+		//tile[LID.y + 2][LID.x + 4] = d_posIn[particleID + 2];
 	}
 	if (readLeftHalo && LID.x <= 1) {					// first column halo
-		tile[LID.y + 2][0] = d_posIn[particleID - 2 + LID.x];
+		//tile[LID.y + 2][LID.x] = d_posIn[particleID - 2 + LID.x];
 	}
 
+	
 	// write corners
 	if (LID.y <= 1 && LID.y <= 1) {		// upper left 2x2 writes all corners. no optimization for only 4 writes
 		if (readLeftHalo) {
 			if (readUpperHalo)			// => upper left
-				tile[LID.y][LID.x] = d_posIn[particleID - 2 + LID.x - (2-LID.y)*width];
+				tile[LID.y][LID.x] = d_posIn[particleID - 2 - 2*width];
 			if (readLowerHalo)			// => lower left
-				tile[TILE_Y + 2 + LID.y][LID.x] = d_posIn[particleID - 2 + LID.x + (TILE_Y + LID.y) *width];
+				tile[TILE_Y + 2 + LID.y][LID.x] = d_posIn[particleID - 2 + TILE_Y *width];
 		}
 		if (readRightHalo) {
 			if (readUpperHalo)			// => upper right
-				tile[LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID - (2-LID.y)* width + 1 + LID.x];
+				tile[LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID - 2 * width + TILE_X];
 			if (readLowerHalo)			// => lower right
-				tile[TILE_Y + 2 + LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID - (TILE_Y + LID.y) *width + 1 + LID.x];
+				tile[TILE_Y + 2 + LID.y][TILE_X + 2 + LID.x] = d_posIn[particleID + TILE_Y *width + TILE_X];
 		}
 	}
-
+	
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("Loaded tile into local memory\n");
 
 
 	// ADD YOUR CODE HERE!
@@ -212,21 +214,21 @@ __kernel void SatisfyConstraints(unsigned int width,
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 - 1], restDistance) * WEIGHT_ORTHO;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 + 1], restDistance) * WEIGHT_ORTHO;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2], restDistance) * WEIGHT_ORTHO;
-		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("structural\n");
+		// if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("structural\n");
 
 		// shear constraints
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 1][LID.x + 2 - 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 1][LID.x + 2 + 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2 - 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 1][LID.x + 2 + 1], restDistance*ROOT_OF_2) * WEIGHT_DIAG;
-		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("shear\n");
+		// if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("shear\n");
 
 		// bend constraints
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 - 2], restDistance*2.f) * WEIGHT_ORTHO_2;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2][LID.x + 2 + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 + 2][LID.x + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2], restDistance*2.f) * WEIGHT_ORTHO_2;
-		if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("bend\n");
+		// if (get_global_id(0) == 2 && get_global_id(1) == 3) printf("bend\n");
 
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2 + 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
 		cumulatedCorrection += SatisfyConstraint(thisPos, tile[LID.y + 2 - 2][LID.x + 2 - 2], restDistance*2.f*ROOT_OF_2) * WEIGHT_DIAG_2;
@@ -236,9 +238,11 @@ __kernel void SatisfyConstraints(unsigned int width,
 		
 	}
 
+	// TODO: limit relaxation
+
 	if (get_global_id(0) == 2 && get_global_id(1) == 3) {
 			//printf("simulationtime: %.2f, elapsed time: %.2f\n", simulationTime, elapsedTime);
-			printf("%.2f, %.2f, %.2f, %.2f\n", cumulatedCorrection);
+			//printf("%.2f, %.2f, %.2f, %.2f\n", cumulatedCorrection);
 		}
 
 	d_posOut[particleID] = thisPos + cumulatedCorrection;

@@ -260,9 +260,6 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 	clErr |= clSetKernelArg(m_IntegrateKernel, 6, sizeof(cl_float), (void*)&m_simulationTime);
 	V_RETURN_CL(clErr, "Failed to set integration kernel params");
 
-
-	// ADD YOUR CODE HERE
-
 	
 	// Execute the integration kernel
 	clErr = clEnqueueNDRangeKernel(CommandQueue, m_IntegrateKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
@@ -273,22 +270,10 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 	clErr |= clSetKernelArg(m_CollisionsKernel, 4, sizeof(cl_float), (void*) &m_SphereRadius);
 	V_RETURN_CL(clErr, "Failed to set collision kernel params");
 	clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
-	//cout << clErr << endl;
 	V_RETURN_CL(clErr, "Error executing collision kernel");
 	
-	// Constraint relaxation: use the ping-pong technique and perform the relaxation in several iterations
-	//for (unsigned int i = 0; i < 2.0 * m_ClothResX; i++){
-	//
-	//	 Execute the constraint relaxation kernel
-	//
-	//	 if(i % 3 == 0)
-	//		 Occasionally check for collisions
-	//
-	//	 Swap the ping pong buffers
-	//}
 
-	//for (unsigned int i = 0; i < 2.0 * m_ClothResX; i++){
-	for (unsigned int i = 0; i < 2; i++){
+	for (unsigned int i = 0; i < 2.0 * m_ClothResX; i++){
 		clErr |= clSetKernelArg(m_ConstraintKernel, 3, sizeof(cl_mem), (void*) &m_clPosArrayAux);
 		clErr |= clSetKernelArg(m_ConstraintKernel, 4, sizeof(cl_mem), (void*) &m_clPosArray);
 		V_RETURN_CL(clErr, "Failed to set constraint kernel params");
@@ -297,19 +282,17 @@ void CClothSimulationTask::ComputeGPU(cl_context , cl_command_queue CommandQueue
 		V_RETURN_CL(clErr, "Error executing constraint kernel %i");
 	
 		if(i % 3 == 0) {
-			//clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+			clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
 			V_RETURN_CL(clErr, "Error executing collision kernel in loop");
 		}
-		//clErr = clFinish(CommandQueue);
-		//V_RETURN_CL(clErr, "Error waiting");
 	
 		swap(m_clPosArray, m_clPosArrayAux);
-		if (i % 2) cout << "."; else cout << ",";
 	}
-	cout << endl;
 	
 
 	// You can check for collisions here again, to make sure there is no intersection with the cloth in the end
+	clErr = clEnqueueNDRangeKernel(CommandQueue, m_CollisionsKernel, 2, 0, globalWorkSize, LocalWorkSize, 0, 0, 0);
+	V_RETURN_CL(clErr, "Error executing collision kernel");
 
 
 
