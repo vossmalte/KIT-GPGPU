@@ -206,17 +206,21 @@ __kernel void Integrate(__global uint *gAlive,
 		// if there is a collision
 		// reset position
 		x1 = x0 + (1.0f - 0.5f) * t*(x1-x0);
-		x1 = (0.5f,0.5f,0.5f,100.f);
+		//x1 = (0.5f,0.5f,0.5f,100.f);
 		// dampen velocity
-		v0 *= 0.7f;
+		v1 *= 0.7f;
+		life *= 0.7f;
 		// reflect:
 		v1 = 2.0f * dot3(v1,n) * n - v1;
 	}
 	
 	// Kill the particle if its life is < 0.0 by setting the corresponding flag in gAlive to 0.
-	if (life < 0.0) {
-		// prinf("Killed particle %i\n", get_global_id(0));
-		*gAlive = 0;
+	if (life < 0.0 || dot3(v1,v1) > 100.f || dot3(x1,x1) > 3.f) {
+		// printf("Killed particle %i\n", get_global_id(0));
+		gAlive[get_global_id(0)] = 0;
+		x1 = (float4)(0.4f, 0.48f, 0.3f, 0.f);
+		life = 100.f;
+		v1 = (float4)(0.2f, 1.f+sin((float) get_global_id(0)), 0.4f*(1+cos((float) get_global_id(0))), 0.f);
 	}
 
 	// write back to global memory
