@@ -1,6 +1,7 @@
 #define DAMPING 0.02f
 
 #define G_ACCEL (float4)(0.f, -9.81f, 0.f, 0.f)
+#define WIND_ACCEL (float4)(-3.f, 0.f, -3.f, 0.f)
 #define ZERO 	(float4)(0.f, 0.f, 0.f, 0.f)
 
 #define WEIGHT_ORTHO	0.138f
@@ -53,13 +54,6 @@
 			//printf("initiating prevPos\n");
 			d_prevPos[particleID] = d_pos[particleID];
 		}
-		if (get_global_id(0) == 2 && get_global_id(1) == 3) {
-			//printf("simulationtime: %.2f, elapsed time: %.2f\n", simulationTime, elapsedTime);
-			//printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
-		}
-		if (particleID == width)
-		//printf("%.2f, %.2f, %.2f, %.2f\n", d_prevPos[particleID]);
-		;
 
 
 		// ADD YOUR CODE HERE!
@@ -70,7 +64,9 @@
 		// position integration:
 		// https://www.lonesock.net/article/verlet.html
 		// xi+1 = xi + (xi - xi-1) * (dti / dti-1) + a * dti * dti
-		float4 pos = d_pos[particleID] + (d_pos[particleID] - d_prevPos[particleID])*elapsedTime + G_ACCEL*elapsedTime*elapsedTime;
+		
+		float4 pos = d_pos[particleID] + (d_pos[particleID] - d_prevPos[particleID])*elapsedTime 
+			+ (G_ACCEL + (1+sin(simulationTime))*WIND_ACCEL) * elapsedTime*elapsedTime;
 		// Move the value from d_pos into d_prevPos and store the new one in d_pos
 		d_prevPos[particleID] = d_pos[particleID];
 		d_pos[particleID] = pos;
@@ -167,21 +163,21 @@ __kernel void SatisfyConstraints(unsigned int width,
 	
 
 	if (readUpperHalo && LID.y <= 1){		// first row
-		//tile[LID.y][LID.x + 2] = d_posIn[particleID - 2*width];
+		tile[LID.y][LID.x + 2] = d_posIn[particleID - 2*width];
 	}
 	if (readLowerHalo && LID.y >= TILE_Y - 2) {			// last row
-		//tile[LID.y + 4][LID.x + 2] = d_posIn[particleID + 2*width];
+		tile[LID.y + 4][LID.x + 2] = d_posIn[particleID + 2*width];
 	}
 	if (readRightHalo && LID.x >= TILE_X - 2) {			// last column halo
-		//tile[LID.y + 2][LID.x + 4] = d_posIn[particleID + 2];
+		tile[LID.y + 2][LID.x + 4] = d_posIn[particleID + 2];
 	}
 	if (readLeftHalo && LID.x <= 1) {					// first column halo
-		//tile[LID.y + 2][LID.x] = d_posIn[particleID - 2 + LID.x];
+		tile[LID.y + 2][LID.x] = d_posIn[particleID - 2];
 	}
 
 	
 	// write corners
-	if (LID.y <= 1 && LID.y <= 1) {		// upper left 2x2 writes all corners. no optimization for only 4 writes
+	if (LID.x <= 1 && LID.y <= 1) {		// upper left 2x2 writes all corners. no optimization for only 4 writes
 		if (readLeftHalo) {
 			if (readUpperHalo)			// => upper left
 				tile[LID.y][LID.x] = d_posIn[particleID - 2 - 2*width];
