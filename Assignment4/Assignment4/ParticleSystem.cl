@@ -103,6 +103,7 @@ bool CheckCollisions(	float4 x0, float4 x1,
 
 	uint local_size = get_local_size(0);	// 192
 	uint nProcessed = 0;  
+	bool collision = false;
 	while (nProcessed < 3*nTriangles) {
 		// write into cache
 		if (get_local_id(0) + nProcessed < 3*nTriangles)
@@ -114,16 +115,22 @@ bool CheckCollisions(	float4 x0, float4 x1,
 		// Iterate over the triangles in the cache and test for the intersection
 		for (uint i = 0; i < min(local_size, 3*nTriangles-nProcessed); i+=3) {
 			// TODO: use closest intersection if possible
+			float local_ray_parameter;
+			float4 local_normal;
 			if (LineTriangleIntersection(x0,x1,
 										lTriangleCache[i], lTriangleCache[i+1], lTriangleCache[i+2],
-										t, n)) {
-				return true;
+										&local_ray_parameter, &local_normal)) {
+				if (local_ray_parameter < *t) {
+					// new closest intersection
+					*t = local_ray_parameter;
+					*n = local_normal;
+				}
+				collision = true;
 										}
 		}
 		nProcessed += local_size;
-		//if (get_global_id(0) == 0) printf("%i / %i\n", nProcessed, nTriangles);  
 	}
-	return false;
+	return collision;
 
 }
 								
@@ -200,7 +207,7 @@ __kernel void Integrate(__global uint *gAlive,
 	// Check for collisions and correct the position and velocity of the particle if it collides with a triangle
 	// - Don't forget to offset the particles from the surface a little bit, otherwise they might get stuck in it.
 	// - Dampen the velocity (e.g. by a factor of 0.7) to simulate dissipation of the energy.
-	float t;	// intersection parameter
+	float t = FLT_MAX; // intersection parameter, init at max for finding closest intersection
 	float4 n;	// normal at the intersection
 	if (CheckCollisions(x0, x1, gTriangleSoup, lTriangleCache, nTriangles, &t, &n)) {
 		// if there is a collision
